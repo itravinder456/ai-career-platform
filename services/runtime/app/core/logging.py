@@ -3,8 +3,8 @@ from app.core.settings import get_settings
 
 
 def setup_logging() -> None:
-    settings = get_settings()
-    configure_logging(service=settings.app_name, level=settings.log_level)
+    s = get_settings()
+    configure_logging(service=s.app_name, level=s.log_level)
 
 
 log = get_logger("runtime")
