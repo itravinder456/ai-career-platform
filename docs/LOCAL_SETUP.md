@@ -1,128 +1,154 @@
-# 🛠️ Local Development Setup
+# Local Development Setup
 
 ## Prerequisites
 
+| Tool | Version | Install |
+|------|---------|---------|
+| Node.js | ≥ 18 | nodejs.org |
+| Python | ≥ 3.12 | python.org |
+| uv | latest | `pip install uv` |
+| Docker + Compose | latest | docker.com |
+| Git | any | git-scm.com |
+
+---
+
+## 1. Clone
+
 ```bash
-node >= 18.0.0
-python >= 3.11
-docker + docker-compose
-git
+git clone <repo-url>
+cd AI-Career-Platform
 ```
 
 ---
 
-## 1. Clone & Setup
+## 2. Environment Files
+
+Copy each example and fill in real values:
 
 ```bash
-git clone https://github.com/ravinder/ai-portfolio.git
-cd ai-portfolio
+cp services/api/.env.example    services/api/.env
+cp services/runtime/.env.example services/runtime/.env
+cp frontend/.env.example         frontend/.env.local
 ```
 
----
+**`services/api/.env`** — minimum required:
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/portfolio
+REDIS_URL=redis://localhost:6379
+QDRANT_URL=http://localhost:6333
+RUNTIME_URL=http://localhost:8001
+ADMIN_SECRET_KEY=<random-hex-32>   # python -c "import secrets; print(secrets.token_hex(32))"
+JWT_SECRET=<random-hex-32>
+```
 
-## 2. Environment Variables
+**`services/runtime/.env`** — pick one LLM provider:
+```env
+LLM_PROVIDER=groq                  # groq | anthropic | ollama
+GROQ_API_KEY=gsk_...               # free tier at console.groq.com
+GROQ_MODEL=llama-3.3-70b-versatile
 
-### Frontend (.env.local)
+# ANTHROPIC_API_KEY=sk-ant-...
+# LLM_PROVIDER=ollama
+# OLLAMA_BASE_URL=http://localhost:11434
+# OLLAMA_MODEL=llama3.1
+
+REDIS_URL=redis://localhost:6379
+QDRANT_URL=http://localhost:6333
+```
+
+**`frontend/.env.local`**:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-### Backend (.env)
-```env
-# LLM
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Databases
-QDRANT_URL=http://localhost:6333
-REDIS_URL=redis://localhost:6379
-DATABASE_URL=postgresql://postgres:password@localhost:5432/portfolio
-
-# Auth
-ADMIN_SECRET_KEY=your-secret-key
-JWT_SECRET=your-jwt-secret
-
-# Observability
-LANGCHAIN_API_KEY=ls-...
-LANGCHAIN_PROJECT=ravinder-portfolio
-LANGCHAIN_TRACING_V2=true
-
-# GitHub
-GITHUB_TOKEN=ghp_...
-GITHUB_USERNAME=ravinder-varikuppala
 ```
 
 ---
 
-## 3. Start with Docker
+## 3. Start Infrastructure
 
 ```bash
-# Start all services
-docker-compose up -d
+make dev-infra
+# starts: postgres, redis, qdrant  (docker-compose profiles)
+```
 
-# Check services running
-docker-compose ps
-
-# View logs
-docker-compose logs -f backend
+Verify all three are healthy:
+```bash
+docker compose ps
+# postgres, redis, qdrant should all show "healthy"
 ```
 
 ---
 
-## 4. Frontend Setup
+## 4. Install Dependencies
 
 ```bash
-cd frontend
-npm install
-npm run dev
-# → http://localhost:3000
+make install
+# installs: uv sync for api + runtime + shared/core, npm install for frontend
 ```
 
 ---
 
-## 5. Backend Setup
+## 5. Run Services (three terminals)
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-# → http://localhost:8000
+# Terminal 1 — API gateway (port 8000)
+make dev-api
+
+# Terminal 2 — LangGraph runtime (port 8001)
+make dev-runtime
+
+# Terminal 3 — Next.js frontend (port 3000)
+make dev-frontend
 ```
 
 ---
 
-## 6. Ingest Knowledge Base
+## 6. Verify
 
 ```bash
-cd backend
-python -m ingestion.pipeline --source ../knowledge-base/
-# This embeds all docs into Qdrant
-```
-
----
-
-## 7. Verify Setup
-
-```bash
-# Check health
+# All infra + services healthy
 curl http://localhost:8000/health
 
-# Test chat
-curl -X POST http://localhost:8000/chat/stream \
+# Quick chat test
+curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Tell me about Ravinder", "session_id": "test"}'
+  -d '{"session_id": "test", "message": "What are your top skills?"}'
+# → streams SSE events: token, widget?, done
 ```
 
 ---
 
-## Services Running
+## Service URLs
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| Frontend | http://localhost:3000 | Next.js app |
-| Backend | http://localhost:8000 | FastAPI |
-| Qdrant UI | http://localhost:6333/dashboard | Vector DB |
-| API Docs | http://localhost:8000/docs | Swagger |
+| Service | URL | Notes |
+|---------|-----|-------|
+| Frontend | http://localhost:3000 | Next.js chat UI |
+| API | http://localhost:8000 | FastAPI gateway |
+| API docs | http://localhost:8000/docs | Swagger |
+| Runtime | http://localhost:8001 | LangGraph agent (internal) |
+| Qdrant UI | http://localhost:6333/dashboard | Vector DB browser |
+
+---
+
+## Docker (full stack)
+
+To run everything in containers:
+
+```bash
+make up        # build + start all services
+make logs      # tail all logs
+make down      # stop + remove containers
+```
+
+---
+
+## Shared Core Changes
+
+After editing anything under `shared/core/`, reinstall the package in both services:
+
+```bash
+uv sync --reinstall-package ravinder-ai-core --directory services/api
+uv sync --reinstall-package ravinder-ai-core --directory services/runtime
+```
+
+This is required because uv caches the built wheel — the reinstall flag
+forces a fresh build from the local path.
