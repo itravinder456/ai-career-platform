@@ -2,13 +2,7 @@ from pydantic import Field
 
 from core.config import AppSettings, make_settings_factory
 from core.config.constants import DEFAULT_CORS_ORIGINS, DEFAULT_RUNTIME_URL
-from core.config.groups import (
-    AuthConfig,
-    DatabaseConfig,
-    ObservabilityConfig,
-    QdrantConfig,
-    RedisConfig,
-)
+from core.config.groups import AuthConfig, DatabaseConfig, ObservabilityConfig, QdrantConfig, RedisConfig
 
 
 class ApiSettings(
@@ -21,7 +15,7 @@ class ApiSettings(
 ):
     app_name: str = Field(default="ravinder-ai-api", alias="APP_NAME")
     runtime_url: str = Field(default=DEFAULT_RUNTIME_URL, alias="RUNTIME_URL")
-    cors_origins: list[str] = Field(default=DEFAULT_CORS_ORIGINS, alias="CORS_ORIGINS")
+    cors_origins: list[str] = Field(default_factory=lambda: DEFAULT_CORS_ORIGINS, alias="CORS_ORIGINS")
 
 
 get_settings = make_settings_factory(ApiSettings)
