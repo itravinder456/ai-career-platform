@@ -1,40 +1,43 @@
-# ── Python ────────────────────────────────────
-**/.venv/
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/*.pyd
-**/.mypy_cache/
-**/.ruff_cache/
-**/.pytest_cache/
-**/*.egg-info/
-**/dist/
-**/build/
+# ── Secrets ────────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+services/**/.env
+services/**/.env.local
 
-# ── Node ──────────────────────────────────────
-**/node_modules/
-**/.next/
-**/out/
-**/.turbo/
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
 
-# ── Environment / secrets ─────────────────────
-**/.env
-# keep .env.example committed
-!**/.env.example
+# ── Node / Next.js ─────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.turbo/
 
-# ── Data / embeddings ─────────────────────────
-data/embeddings/*
-!data/embeddings/.gitkeep
+# ── Docker ─────────────────────────────────────────────────────────────────────
+.docker/
 
-# ── IDE / tooling ─────────────────────────────
-.vscode/
-.idea/
-.claude/
-
-# ── OS ────────────────────────────────────────
+# ── OS ─────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# ── Logs ──────────────────────────────────────
+# ── IDE ────────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Data / uploads ─────────────────────────────────────────────────────────────
+data/uploads/
 *.log
-logs/

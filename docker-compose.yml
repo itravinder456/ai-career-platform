@@ -1,70 +1,126 @@
-version: '3.9'
+name: ai-career-platform
 
 services:
 
-  # ── Frontend ──────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: ../infrastructure/docker/Dockerfile.frontend
-    ports:
-      - "3000:3000"
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-
-  # ── Backend ───────────────────────────────
-  backend:
-    build:
-      context: ./backend
-      dockerfile: ../infrastructure/docker/Dockerfile.backend
+      POSTGRES_DB: ${POSTGRES_DB:-portfolio}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
+      - "5432:5432"
     volumes:
-      - ./backend:/app
-      - ./knowledge-base:/knowledge-base
-    depends_on:
-      - qdrant
-      - redis
-      - postgres
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # ── Qdrant Vector DB ──────────────────────
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Qdrant ─────────────────────────────────────────────────────────────────
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.9.3
+    restart: unless-stopped
     ports:
       - "6333:6333"
       - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
-
-  # ── Redis Session Cache ────────────────────
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-
-  # ── PostgreSQL Chat History ────────────────
-  postgres:
-    image: postgres:15-alpine
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_DB: portfolio
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Runtime (LangGraph agents) ─────────────────────────────────────────────
+  runtime:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.runtime
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - services/runtime/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  # ── API gateway ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - services/api/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-portfolio}
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      RUNTIME_URL: http://runtime:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      runtime:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
-  qdrant_data:
-  redis_data:
   postgres_data:
+  redis_data:
+  qdrant_data:
