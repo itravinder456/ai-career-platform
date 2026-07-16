@@ -2,15 +2,20 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.core.logging import log, setup_logging
+from app.clients.http import close_http_client, get_http_client
 from app.db.postgres import close_db, init_db
 from app.db.qdrant import close_qdrant, ensure_collection
 from app.db.redis import close_redis, get_redis_client
+from core.config import get_settings
+from core.logging.setup import configure_logging, get_logger
+
+log = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    setup_logging()
+    settings = get_settings()
+    configure_logging(service=settings.app_name, level=settings.log_level)
     log.info("api.startup")
 
     try:
@@ -31,9 +36,13 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         log.warning("qdrant.unavailable", error=str(exc))
 
+    get_http_client()
+    log.info("http_client.ready")
+
     yield
 
     await close_db()
     await close_redis()
     await close_qdrant()
+    await close_http_client()
     log.info("api.shutdown")

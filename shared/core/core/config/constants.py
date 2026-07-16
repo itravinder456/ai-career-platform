@@ -5,6 +5,8 @@
 APP_NAME = "ravinder-ai"
 DEFAULT_ENVIRONMENT = "development"
 DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_HOST = "0.0.0.0"
+DEFAULT_PORT = 8000
 
 # ── LLM — model behaviour (not keys) ─────────────────────────────────────────
 ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-5"
@@ -28,10 +30,6 @@ DEFAULT_QDRANT_COLLECTION = "ravinder"
 # ── Auth — algorithm config only (no secrets) ────────────────────────────────
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_MINUTES = 60
-
-# ── GitHub — public config only (no tokens) ───────────────────────────────────
-GITHUB_API_URL = "https://api.github.com"
-GITHUB_USERNAME = "ravinder-varikuppala"
 
 # ── Observability ─────────────────────────────────────────────────────────────
 LANGSMITH_DEFAULT_PROJECT = "ravinder-ai"

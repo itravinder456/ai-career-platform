@@ -1,9 +1,6 @@
-import json
-from typing import Any
-
 import redis.asyncio as aioredis
 
-from app.core.settings import get_settings
+from core.config import get_settings
 
 _pool: aioredis.ConnectionPool | None = None
 _client: aioredis.Redis | None = None  # type: ignore[type-arg]
@@ -31,29 +28,3 @@ async def close_redis() -> None:
     if _pool is not None:
         await _pool.aclose()
         _pool = None
-
-
-# ── Session helpers ────────────────────────────────────────────────────────────
-
-async def get_session(session_id: str) -> list[dict[str, Any]]:
-    client = get_redis_client()
-    s = get_settings()
-    raw = await client.get(f"session:{session_id}")
-    if not raw:
-        return []
-    return json.loads(raw)  # type: ignore[arg-type]
-
-
-async def set_session(session_id: str, messages: list[dict[str, Any]]) -> None:
-    client = get_redis_client()
-    s = get_settings()
-    await client.setex(
-        f"session:{session_id}",
-        s.session_ttl_seconds,
-        json.dumps(messages),
-    )
-
-
-async def delete_session(session_id: str) -> None:
-    client = get_redis_client()
-    await client.delete(f"session:{session_id}")

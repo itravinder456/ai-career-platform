@@ -1,4 +1,4 @@
-﻿from core.config import AppSettings, load_settings, make_settings_factory
+﻿from core.config import AppSettings
 from core.exceptions import (
     AppError,
     ConflictError,
@@ -17,8 +17,6 @@ from core.utils import is_expired, retry, slugify, utcnow
 __all__ = [
     # config
     "AppSettings",
-    "load_settings",
-    "make_settings_factory",
     # exceptions
     "AppError",
     "NotFoundError",

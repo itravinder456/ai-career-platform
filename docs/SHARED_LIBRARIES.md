@@ -34,11 +34,12 @@ shared/core/
     ├── __init__.py
     ├── config/
     │   ├── __init__.py
-    │   ├── base.py
-    │   └── groups/
-    │       ├── __init__.py
-    │       ├── database.py
-    │       └── redis.py
+    │   ├── base.py       AppSettings — single settings class, every field, every service
+    │   └── constants.py
+    ├── exceptions/
+    │   ├── __init__.py
+    │   ├── base.py        AppError hierarchy
+    │   └── handlers.py    register_exception_handlers(app)
     └── logging/
         ├── __init__.py
         └── setup.py
@@ -114,21 +115,24 @@ uv pip show ravinder-ai-core
 
 ## Step 5 — Import in Service Code
 
-```python
-# services/api/app/core/settings.py
-from core.config.base import AppSettings
-from core.config.groups.database import DatabaseConfig
-from core.config.groups.redis import RedisConfig
+There's no per-service settings class — `AppSettings` in `core.config` is the single schema for
+every service, with every field defaulted so nothing is required. Each service just imports
+`get_settings` directly and relies on its own `.env` to supply the values it needs:
 
-class ApiSettings(AppSettings, DatabaseConfig, RedisConfig):
-    runtime_url: str = "http://localhost:8001"
+```python
+# services/api/app/core/lifespan.py
+from core.config import get_settings
+
+settings = get_settings()
+settings.database_url   # from services/api/.env
+settings.runtime_url    # from services/api/.env
 ```
 
 ```python
 # services/runtime/app/graphs/career.py
 from core.logging.setup import get_logger
 
-log = get_logger("runtime.graph")
+log = get_logger(__name__)   # always __name__, not a hand-typed string — auto-namespaced per module
 ```
 
 ---
@@ -143,11 +147,9 @@ uv sync --reinstall-package ravinder-ai-core --directory services/api
 uv sync --reinstall-package ravinder-ai-core --directory services/runtime
 ```
 
-Or via the Makefile shortcut if you add one:
-```makefile
-sync-core:
-	uv sync --reinstall-package ravinder-ai-core --directory services/api
-	uv sync --reinstall-package ravinder-ai-core --directory services/runtime
+Or just:
+```bash
+make sync-core
 ```
 
 ---
@@ -203,49 +205,48 @@ from auth.jwt import create_access_token, decode_token
 |------|--------|
 | No service-specific code in shared packages | Packages must be reusable across services |
 | Secrets come from env, never hardcoded | Packages are version-controlled; .env files are not |
-| Mixins over inheritance chains | Each group mixin is independently testable |
 | `extra="ignore"` on BaseSettings | Services can have env vars the package doesn't know about |
 | `SecretStr` for credentials | Prevents secrets appearing in logs or `__repr__` |
 
 ---
 
-## Mixin Config Pattern (used in this project)
+## Config Pattern (used in this project)
 
-```python
-# shared/core/core/config/groups/redis.py
-from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings
-
-class RedisConfig(BaseSettings):
-    redis_url: SecretStr = Field(alias="REDIS_URL")
-    redis_max_connections: int = Field(default=20)
-    session_ttl_seconds: int = Field(default=7200)
-```
+One `AppSettings` class in `shared/core/core/config/base.py` declares every field any service
+might need — there's no per-service subclass and no per-domain mixin. Every field has a default
+(`None` for optional secrets/URLs), so nothing is required at the schema level:
 
 ```python
 # shared/core/core/config/base.py
-from pydantic_settings import BaseSettings
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AppSettings(BaseSettings):
-    environment: str = Field(default="development")
-    log_level: str = Field(default="INFO")
-
-    @property
-    def is_production(self) -> bool:
-        return self.environment == "production"
-
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",           # tolerate unknown env vars
         case_sensitive=False,
         populate_by_name=True,
     )
+
+    environment: str = Field(default="development", alias="ENVIRONMENT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    redis_url: SecretStr | None = Field(default=None, alias="REDIS_URL")
+    database_url: SecretStr | None = Field(default=None, alias="DATABASE_URL")
+    # ...every other field, same pattern
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
+
+@lru_cache
+def get_settings() -> AppSettings:
+    return AppSettings()
 ```
 
-A service composes exactly what it needs:
-```python
-class ApiSettings(AppSettings, DatabaseConfig, RedisConfig, QdrantConfig, AuthConfig):
-    runtime_url: str = Field(default="http://localhost:8001")
-```
-
-Pydantic's MRO linearisation merges all field definitions cleanly.
+What makes a field "belong" to `api` vs `runtime` is entirely which vars each service's own
+`.env` sets — `services/api/.env` sets `DATABASE_URL`/`JWT_SECRET`, `services/runtime/.env` sets
+`GROQ_API_KEY`, and each just leaves the other's vars unset (they stay at their default). Both
+services import the exact same `get_settings` from `core.config` — no wiring per service.

@@ -63,10 +63,10 @@ services:
     env_file:
       - services/runtime/.env
     environment:
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-portfolio}
       QDRANT_URL: http://qdrant:6333
     depends_on:
-      redis:
+      postgres:
         condition: service_healthy
       qdrant:
         condition: service_healthy

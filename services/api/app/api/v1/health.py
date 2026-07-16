@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.core.logging import log
 from app.db.postgres import get_engine
 from app.db.qdrant import get_qdrant_client
 from app.db.redis import get_redis_client
+from core.logging.setup import get_logger
 
+log = get_logger(__name__)
 router = APIRouter()
 
 

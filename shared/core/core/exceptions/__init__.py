@@ -8,6 +8,7 @@ from core.exceptions.base import (
     UpstreamError,
     ValidationError,
 )
+from core.exceptions.handlers import register_exception_handlers
 
 __all__ = [
     "AppError",
@@ -18,4 +19,5 @@ __all__ = [
     "ConflictError",
     "ServiceUnavailableError",
     "UpstreamError",
+    "register_exception_handlers",
 ]

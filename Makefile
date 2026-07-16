@@ -1,6 +1,6 @@
 .PHONY: help install dev build up down restart logs clean \
         api-shell runtime-shell db-shell redis-shell \
-        migrate test lint format
+        migrate test lint format sync-core
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 DOCKER_COMPOSE := docker compose
@@ -13,6 +13,7 @@ help:
 	@echo ""
 	@echo "  Dev (local)"
 	@echo "    make install         Install all Python + Node deps"
+	@echo "    make sync-core       Reinstall shared/core into api + runtime after editing it"
 	@echo "    make dev             Start infra (postgres/redis/qdrant) + run api & runtime locally"
 	@echo "    make dev-frontend    Start the Next.js dev server"
 	@echo ""
@@ -54,6 +55,12 @@ install-shared:
 install-frontend:
 	cd frontend && npm install
 
+# uv path-deps aren't live-linked — after editing shared/core, force a reinstall
+# in every service that depends on it, or changes silently won't take effect.
+sync-core:
+	cd services/api && $(UV) sync --reinstall-package ravinder-ai-core
+	cd services/runtime && $(UV) sync --reinstall-package ravinder-ai-core
+
 # ── Local dev (infra in Docker, services on host) ──────────────────────────────
 dev-infra:
 	$(DOCKER_COMPOSE) up -d postgres redis qdrant
@@ -62,7 +69,7 @@ dev-api: dev-infra
 	cd services/api && $(UV) run uvicorn app.main:app --reload --port 8000
 
 dev-runtime: dev-infra
-	cd services/runtime && $(UV) run uvicorn app.main:app --reload --port 8001
+	cd services/runtime && $(UV) run python run_dev.py
 
 dev-frontend:
 	cd frontend && npm run dev

@@ -1,36 +1,37 @@
 """
-POST /api/v1/run — internal endpoint called by services/api.
-Accepts session history + user message, runs the LangGraph career graph,
-streams tokens and widget events back via SSE.
+POST   /api/v1/run             — internal endpoint called by services/api.
+                                  Runs the LangGraph career graph for one turn,
+                                  streams tokens and widget events back via SSE.
+                                  Conversation history is loaded/saved automatically
+                                  by the graph's checkpointer, keyed by session_id.
+DELETE /api/v1/run/{session_id} — clears that conversation's checkpoint state.
 """
 
 import json
 from collections.abc import AsyncGenerator
-from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from pydantic import Field
 
-from app.core.logging import log
-from app.graphs.career import career_graph
 from app.state.agent_state import AgentState
+from core.logging.setup import get_logger
 from core.models.base import AppModel
 
+log = get_logger(__name__)
 router = APIRouter()
 
 
 class RunRequest(AppModel):
     session_id: str = Field(..., min_length=1)
-    history: list[dict[str, Any]] = Field(default_factory=list)
     message: str = Field(..., min_length=1)
 
 
 @router.post("/run")
-async def run(body: RunRequest) -> StreamingResponse:
+async def run(body: RunRequest, request: Request) -> StreamingResponse:
     return StreamingResponse(
-        _stream(body),
+        _stream(body, request),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -39,27 +40,27 @@ async def run(body: RunRequest) -> StreamingResponse:
     )
 
 
+@router.delete("/run/{session_id}", status_code=204)
+async def clear_run(session_id: str, request: Request) -> Response:
+    checkpointer = request.app.state.checkpointer
+    await checkpointer.adelete_thread(session_id)
+    log.info("run.cleared", session_id=session_id)
+    return Response(status_code=204)
+
+
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-def _history_to_messages(history: list[dict[str, Any]]) -> list[HumanMessage | AIMessage]:
-    msgs: list[HumanMessage | AIMessage] = []
-    for item in history:
-        role = item.get("role", "")
-        content = item.get("content", "")
-        if role == "user":
-            msgs.append(HumanMessage(content=content))
-        elif role == "assistant":
-            msgs.append(AIMessage(content=content))
-    return msgs
-
-
-async def _stream(body: RunRequest) -> AsyncGenerator[str, None]:
+async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, None]:
     log.info("run.start", session_id=body.session_id, message_preview=body.message[:80])
 
+    career_graph = request.app.state.career_graph
+
+    # Only the new turn goes in — the checkpointer loads prior messages for
+    # this thread_id and merges this HumanMessage in via the add_messages reducer.
     initial_state: AgentState = {
-        "messages": _history_to_messages(body.history),
+        "messages": [HumanMessage(content=body.message)],
         "session_id": body.session_id,
         "user_input": body.message,
         "intent": "general",
@@ -67,11 +68,12 @@ async def _stream(body: RunRequest) -> AsyncGenerator[str, None]:
         "response": "",
         "widgets": [],
     }
+    config = {"configurable": {"thread_id": body.session_id}}
 
     try:
         # Run graph to completion — respond node strips WIDGET from response_text
         # and stores it in state["widgets"]. We then emit clean text + widgets.
-        final_state: AgentState = await career_graph.ainvoke(initial_state)
+        final_state: AgentState = await career_graph.ainvoke(initial_state, config=config)
 
         response_text = final_state.get("response", "")
         if response_text:

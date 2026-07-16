@@ -1,3 +1,3 @@
-from app.graphs.career import career_graph
+from app.graphs.career import build_career_graph
 
-__all__ = ["career_graph"]
+__all__ = ["build_career_graph"]

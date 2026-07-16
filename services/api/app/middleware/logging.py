@@ -7,7 +7,7 @@ from starlette.responses import Response
 
 from core.logging.setup import get_logger
 
-log = get_logger("api.http")
+log = get_logger(__name__)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
