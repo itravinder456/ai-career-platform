@@ -1,5 +1,6 @@
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from functools import lru_cache
 
 from core.config.constants import APP_NAME, DEFAULT_ENVIRONMENT, DEFAULT_LOG_LEVEL
 
@@ -47,3 +48,9 @@ class AppSettings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.environment == "development"
+
+@lru_cache
+def get_app_settings() -> AppSettings:
+    return AppSettings()
+
+
