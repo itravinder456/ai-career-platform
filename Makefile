@@ -1,6 +1,6 @@
 .PHONY: help install dev build up down restart logs clean \
         api-shell runtime-shell db-shell redis-shell \
-        migrate test lint format sync-core
+        migrate test lint format sync-core ingest
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 DOCKER_COMPOSE := docker compose
@@ -16,6 +16,7 @@ help:
 	@echo "    make sync-core       Reinstall shared/core into api + runtime after editing it"
 	@echo "    make dev             Start infra (postgres/redis/qdrant) + run api & runtime locally"
 	@echo "    make dev-frontend    Start the Next.js dev server"
+	@echo "    make ingest          Run the RAG ingestion pipeline (data/ -> Qdrant)"
 	@echo ""
 	@echo "  Docker"
 	@echo "    make build           Build all Docker images"
@@ -41,13 +42,16 @@ help:
 	@echo ""
 
 # ── Local install ──────────────────────────────────────────────────────────────
-install: install-api install-runtime install-frontend
+install: install-api install-runtime install-ingestion install-frontend
 
 install-api:
 	cd services/api && $(UV) sync
 
 install-runtime:
 	cd services/runtime && $(UV) sync
+
+install-ingestion:
+	cd services/ingestion && $(UV) sync
 
 install-shared:
 	cd shared/core && $(UV) sync
@@ -60,6 +64,7 @@ install-frontend:
 sync-core:
 	cd services/api && $(UV) sync --reinstall-package ravinder-ai-core
 	cd services/runtime && $(UV) sync --reinstall-package ravinder-ai-core
+	cd services/ingestion && $(UV) sync --reinstall-package ravinder-ai-core
 
 # ── Local dev (infra in Docker, services on host) ──────────────────────────────
 dev-infra:
@@ -73,6 +78,10 @@ dev-runtime: dev-infra
 
 dev-frontend:
 	cd frontend && npm run dev
+
+# ── Ingestion ──────────────────────────────────────────────────────────────────
+ingest: dev-infra
+	cd services/ingestion && $(UV) run python -m app.cli
 
 # ── Docker ─────────────────────────────────────────────────────────────────────
 build:
@@ -123,18 +132,22 @@ migrate-new:
 test:
 	cd services/api && $(UV) run pytest tests/ -v
 	cd services/runtime && $(UV) run pytest tests/ -v
+	cd services/ingestion && $(UV) run pytest tests/ -v
 
 lint:
 	cd services/api && $(UV) run ruff check app/
 	cd services/api && $(UV) run mypy app/
 	cd services/runtime && $(UV) run ruff check app/
 	cd services/runtime && $(UV) run mypy app/
+	cd services/ingestion && $(UV) run ruff check app/
+	cd services/ingestion && $(UV) run mypy app/
 	cd shared/core && $(UV) run ruff check core/
 	cd frontend && npm run lint
 
 format:
 	cd services/api && $(UV) run ruff format app/
 	cd services/runtime && $(UV) run ruff format app/
+	cd services/ingestion && $(UV) run ruff format app/
 	cd shared/core && $(UV) run ruff format core/
 
 # ── Clean ──────────────────────────────────────────────────────────────────────

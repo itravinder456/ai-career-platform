@@ -37,7 +37,10 @@ services:
 
   # ── Qdrant ─────────────────────────────────────────────────────────────────
   qdrant:
-    image: qdrant/qdrant:v1.9.3
+    # v1.9.3 predates Qdrant's unified Query API (/points/query, added in 1.10) that
+    # qdrant-client>=1.18's AsyncQdrantClient.query_points() requires — client 1.18
+    # dropped .search() entirely, so retrieval 404s against anything older than 1.10.
+    image: qdrant/qdrant:v1.12.4
     restart: unless-stopped
     ports:
       - "6333:6333"

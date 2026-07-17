@@ -1,19 +1,27 @@
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from typing import TYPE_CHECKING
 
 from core.exceptions.base import AppError, ValidationError
 from core.logging.setup import get_logger
 
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
 log = get_logger(__name__)
 
 
-def register_exception_handlers(app: FastAPI) -> None:
+def register_exception_handlers(app: "FastAPI") -> None:
     """
     Single source of the error response shape: {"error": {"code", "message", "details"}}.
     Every failure mode (app-raised, request validation, unhandled) is normalized to an
     AppError first, so the JSON body is always built by AppError.to_dict() — never by hand.
+
+    FastAPI is imported lazily here, not at module scope, so that non-web consumers of
+    ravinder-ai-core (e.g. the ingestion pipeline) can import core.exceptions/core.models
+    without needing fastapi installed — it's only required if this function is called.
     """
+    from fastapi import Request
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import JSONResponse
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:

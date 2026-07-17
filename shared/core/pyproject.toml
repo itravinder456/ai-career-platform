@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Shared core package — config, logging, telemetry, models, utils"
 requires-python = ">=3.12"
 dependencies = [
+    "httpx>=0.28.1",
+    "openai>=1.60.0",
     "pydantic>=2.7",
     "pydantic-settings>=2.2",
     "structlog>=24.1",
@@ -15,8 +17,16 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 packages = ["core"]
 
-[tool.uv]
-dev-dependencies = []
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.21",
+]
 
 [tool.ruff]
 line-length = 100

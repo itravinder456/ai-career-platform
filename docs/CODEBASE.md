@@ -2,6 +2,9 @@
 
 A request-by-request walkthrough of every service, from browser to LLM and back.
 
+> For a deeper look at any one service — design tradeoffs, known gaps, how to change it — see
+> [docs/services/](./services/README.md).
+
 ---
 
 ## Repository Layout
@@ -11,7 +14,8 @@ AI-Career-Platform/
 ├── frontend/               Next.js 16 chat UI
 ├── services/
 │   ├── api/                FastAPI gateway (port 8000)
-│   └── runtime/            LangGraph agent (port 8001, internal)
+│   ├── runtime/            LangGraph agent (port 8001, internal)
+│   └── ingestion/          RAG ingestion pipeline (CLI, no port — see docs/services/ingestion.md)
 ├── shared/
 │   └── core/               Internal Python package — config, logging
 ├── infrastructure/

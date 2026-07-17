@@ -27,7 +27,9 @@ Instead of a static portfolio, recruiters can:
 Next.js Frontend → FastAPI → LangGraph Agents → MCP Tools → RAG (Qdrant)
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for full details.
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for full details,
+[docs/CODEBASE.md](./docs/CODEBASE.md) for a request-by-request walkthrough, or
+[docs/services/](./docs/services/README.md) for a tradeoffs-and-gaps deep dive per service.
 
 ---
 

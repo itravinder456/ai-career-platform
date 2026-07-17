@@ -20,6 +20,7 @@ from core.config.constants import (
     DEFAULT_QDRANT_COLLECTION,
     DEFAULT_RUNTIME_URL,
     EMBEDDING_DEFAULT_MODEL,
+    EMBEDDING_DEFAULT_PROVIDER,
     EMBEDDING_VECTOR_SIZE,
     JWT_ALGORITHM,
     JWT_EXPIRY_MINUTES,
@@ -88,6 +89,7 @@ class AppSettings(BaseSettings):
     ollama_model: str = Field(default="llama3.2", alias="OLLAMA_MODEL")
     llm_temperature: float = Field(default=ANTHROPIC_TEMPERATURE, alias="LLM_TEMPERATURE")
     llm_max_tokens: int = Field(default=ANTHROPIC_MAX_TOKENS, alias="LLM_MAX_TOKENS")
+    embedding_provider: str = Field(default=EMBEDDING_DEFAULT_PROVIDER, alias="EMBEDDING_PROVIDER")
     embedding_model: str = Field(default=EMBEDDING_DEFAULT_MODEL, alias="EMBEDDING_MODEL")
     embedding_vector_size: int = Field(default=EMBEDDING_VECTOR_SIZE, alias="EMBEDDING_VECTOR_SIZE")
     openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
