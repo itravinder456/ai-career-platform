@@ -1,107 +1,21 @@
 "use client";
 
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Message } from "@/types/chat";
 import WidgetRenderer from "@/components/widgets/WidgetRenderer";
 import TypingIndicator from "./TypingIndicator";
+import StepTrace from "./StepTrace";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// ── Inline markdown: **bold**, `code` ─────────────────────────────────────────
-function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*\n]+?\*\*|`[^`\n]+?`)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return (
-        <strong key={i} style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return (
-        <code
-          key={i}
-          style={{
-            fontFamily: "var(--font-geist-mono), monospace",
-            fontSize: "0.85em",
-            padding: "1px 5px",
-            borderRadius: 4,
-            background: "rgba(124,95,248,0.12)",
-            color: "var(--accent-3)",
-            border: "1px solid rgba(124,95,248,0.18)",
-          }}
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-    return part;
-  });
-}
-
-// ── Block markdown renderer ───────────────────────────────────────────────────
+// GitHub-Flavored Markdown, themed via the .markdown-body rules in globals.css.
+// react-markdown renders partial markdown gracefully, so streaming mid-token is fine.
 function MarkdownContent({ text }: { text: string }) {
-  const blocks: React.ReactNode[] = [];
-  const paragraphs = text.split(/\n{2,}/);
-
-  paragraphs.forEach((para, pi) => {
-    if (!para.trim()) return;
-
-    const lines = para.split("\n");
-
-    // Ordered list
-    if (/^\d+\.\s/.test(lines[0].trim())) {
-      blocks.push(
-        <ol key={pi} style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
-          {lines.map((line, li) => {
-            const text = line.trim().replace(/^\d+\.\s+/, "");
-            if (!text) return null;
-            return <li key={li} style={{ color: "var(--text-secondary)" }}>{renderInline(text)}</li>;
-          })}
-        </ol>
-      );
-      return;
-    }
-
-    // Unordered list
-    if (/^[*\-]\s/.test(lines[0].trim())) {
-      blocks.push(
-        <ul key={pi} style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
-          {lines.map((line, li) => {
-            const text = line.trim().replace(/^[*\-]\s+/, "");
-            if (!text) return null;
-            return <li key={li} style={{ color: "var(--text-secondary)" }}>{renderInline(text)}</li>;
-          })}
-        </ul>
-      );
-      return;
-    }
-
-    // Paragraph (with inline newlines preserved)
-    blocks.push(
-      <p key={pi} style={{ color: "var(--text-secondary)" }}>
-        {lines.map((line, li) => (
-          <span key={li}>
-            {renderInline(line)}
-            {li < lines.length - 1 && <br />}
-          </span>
-        ))}
-      </p>
-    );
-  });
-
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        fontSize: 14,
-        lineHeight: 1.75,
-      }}
-    >
-      {blocks}
+    <div className="markdown-body">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
 }
@@ -185,19 +99,26 @@ export default function MessageBubble({ message }: { message: Message }) {
 
       {/* Message body */}
       <div style={{ paddingLeft: 42 }}>
+        {message.steps && message.steps.length > 0 && (
+          <StepTrace steps={message.steps} streaming={message.isStreaming} />
+        )}
+
         {message.isStreaming && !message.content ? (
-          <div
-            style={{
-              display: "inline-flex",
-              borderRadius: "4px 12px 12px 12px",
-              padding: "12px 16px",
-              background: "rgba(124,95,248,0.05)",
-              border: "1px solid rgba(124,95,248,0.12)",
-              borderLeft: "2px solid rgba(124,95,248,0.35)",
-            }}
-          >
-            <TypingIndicator />
-          </div>
+          // Steps already convey progress; only show the bare typing dots before any step arrives.
+          (!message.steps || message.steps.length === 0) && (
+            <div
+              style={{
+                display: "inline-flex",
+                borderRadius: "4px 12px 12px 12px",
+                padding: "12px 16px",
+                background: "rgba(124,95,248,0.05)",
+                border: "1px solid rgba(124,95,248,0.12)",
+                borderLeft: "2px solid rgba(124,95,248,0.35)",
+              }}
+            >
+              <TypingIndicator />
+            </div>
+          )
         ) : (
           <div
             style={{

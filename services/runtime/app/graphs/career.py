@@ -3,84 +3,46 @@ Career AI — LangGraph supervisor graph.
 
 Flow:
   START → classify_intent → route → [project | skills | resume | jd_match | architecture | general]
-                                   → respond ⇄ tools → END
-                                     (tool loop only fires once TOOLS below is non-empty)
+                                   → respond → END
 
 Each specialised node enriches `state.context` with the right knowledge-base data
-then hands off to `respond` which calls the LLM with the full context. `respond`
-loops through `tools` whenever the LLM emits tool calls, and only reaches END
-once it answers without requesting a tool — the standard ReAct shape, via
-LangGraph's prebuilt ToolNode/tools_condition.
+(mandatory RAG retrieval — see below) then hands off to `respond`, which calls the
+LLM with the full context and returns the final answer.
+
+No tool-calling is bound to this LLM call right now — retrieval already runs
+automatically per intent (app.tools.retrieval.retrieve_context), so the base LLM has
+no need to call tools itself, and Groq's streaming + bound-tools combination was
+throwing intermittent `tool call validation failed` errors mid-stream. Real agentic
+tool-calling (a planner routing to sub-agents/tools) is deliberately deferred to the
+upcoming multi-agent/planner-executor work rather than patched back in here.
+
+LLM provider selection lives in app.core.llm (graph-agnostic — reusable by any future
+graph); prompt templates and the WIDGET-parsing protocol live in app.prompts. This file
+holds only what's specific to *this* graph: intent taxonomy, context assembly, and topology.
 """
 
 import json
 
-from langchain_anthropic import ChatAnthropic
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import SystemMessage
-from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import START, StateGraph
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.graph import END, START, StateGraph
 
-from app.knowledge.profile import (
-    PROFILE,
-    PROJECTS_DETAIL,
-    RESUME_DATA,
-    SKILLS_DETAIL,
-    TECH_STACK_CATEGORIES,
-)
+from app.core.llm import build_llm
+from app.prompts.career import BASE_SYSTEM, WIDGET_INSTRUCTION, parse_widget_block
 from app.state.agent_state import AgentState, Intent
+from app.streaming import emit_step
+from app.tools.retrieval import retrieve_context
 from core.config import get_settings
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)
-
-# ── Tools ─────────────────────────────────────────────────────────────────────
-# Scaffold for multi-step reasoning: empty for now. To add a tool, write a
-# @tool-decorated function and append it here — no other graph changes needed,
-# the respond ⇄ tools loop below already handles routing, execution, and
-# looping back with the tool's result.
-TOOLS: list[BaseTool] = []
-
-# ── System prompt ──────────────────────────────────────────────────────────────
-
-BASE_SYSTEM = f"""You are Ravinder AI, an intelligent AI assistant that represents Ravinder Varikuppala \
-to recruiters and hiring managers. Answer questions accurately based ONLY on the provided profile data. \
-Be concise, confident, and professional — like Ravinder himself speaking.
-
-'You' - always refers to Ravinder Varikuppala. 'I' - always refers to Ravinder AI, the assistant.
-
-When you comes from the user, it is a question or request about Ravinder's skills, experience, projects, or resume. \
-
-When listing projects or skills, include specific metrics and tech names. \
-If asked about something not in the profile, say so honestly.
-
-Do NOT hallucinate job titles, companies, or technologies not listed below.
-
---- PROFILE ---
-{PROFILE}
-"""
-
-WIDGET_INSTRUCTION = """
-After your response, if the context warrants it, output a WIDGET block on a new line:
-Format: WIDGET:<type>:<json>
-
-Supported widget types and their JSON schemas:
-- WIDGET:skill_graph:{{"skills":[{{"name":"...","level":0-100}}]}}
-- WIDGET:tech_stack:{{"categories":[{{"label":"...","items":["..."]}}]}}
-- WIDGET:project_card:{{"name":"...","description":"...","status":"...","tech":["..."],"impact":["..."],"github":"url or null"}}
-- WIDGET:resume_preview:{{"name":"...","title":"...","experience":[{{"company":"...","role":"...","duration":"...","highlight":"..."}}],"education":"...","downloadUrl":"/resume.pdf"}}
-- WIDGET:architecture:{{"layers":[{{"name":"...","items":["..."]}}]}}
-
-Only emit ONE widget per response, only when it genuinely helps visualise the data.
-"""
 
 
 # ── Node: classify intent ──────────────────────────────────────────────────────
 
 
 def classify_intent(state: AgentState) -> dict:
+    emit_step("classify")
     user_input = state["user_input"].lower()
 
     if any(
@@ -132,109 +94,91 @@ def classify_intent(state: AgentState) -> dict:
 
 
 # ── Node: context loaders (one per intent) ────────────────────────────────────
+#
+# All six run mandatory retrieval against Qdrant using the user's own question as the
+# query — career facts come from RAG only (see app.knowledge.profile and
+# app.prompts.career), never from hardcoded data. This is deliberately universal, not
+# gated by intent: classify_intent is a keyword match and *will* miss real career
+# questions phrased unexpectedly (e.g. "tell me about yourself" matches no keyword and
+# used to fall to "general", which skipped retrieval — with zero grounding, the model
+# would sometimes fabricate a plausible-sounding bio instead of admitting it had no
+# data). Retrieving unconditionally means there's always real context to answer from
+# or to honestly say "not covered", never a genuinely empty-handed model.
 
 
-def load_project_context(state: AgentState) -> dict:
+async def load_project_context(state: AgentState) -> dict:
+    emit_step("retrieve")
     return {
         "context": {
-            "projects": PROJECTS_DETAIL,
-            "hint": "Describe projects in detail with tech, impact, and architecture. Offer the project_card widget.",
+            "retrieved": await retrieve_context(state["user_input"]),
+            "hint": "Describe projects in detail with tech, impact, and architecture. Offer the "
+            "project_card widget.",
         }
     }
 
 
-def load_skills_context(state: AgentState) -> dict:
+async def load_skills_context(state: AgentState) -> dict:
+    emit_step("retrieve")
     return {
         "context": {
-            "skills": SKILLS_DETAIL,
-            "tech_stack": TECH_STACK_CATEGORIES,
-            "hint": "List skills with proficiency percentages. Offer skill_graph or tech_stack widget.",
+            "retrieved": await retrieve_context(state["user_input"]),
+            "hint": "List skills grouped sensibly. Offer the tech_stack widget.",
         }
     }
 
 
-def load_resume_context(state: AgentState) -> dict:
+async def load_resume_context(state: AgentState) -> dict:
+    emit_step("retrieve")
     return {
         "context": {
-            "resume": RESUME_DATA,
+            "retrieved": await retrieve_context(state["user_input"]),
             "hint": "Summarise experience concisely. Offer the resume_preview widget.",
         }
     }
 
 
-def load_jd_context(state: AgentState) -> dict:
+async def load_jd_context(state: AgentState) -> dict:
+    emit_step("retrieve")
     return {
         "context": {
-            "skills": SKILLS_DETAIL,
-            "projects": PROJECTS_DETAIL,
-            "hint": "Analyse the JD against Ravinder's skills and experience. Score the match out of 10. Be specific about gaps.",
+            "retrieved": await retrieve_context(state["user_input"]),
+            "hint": "Analyse the JD against Ravinder's skills and experience. Score the match out "
+            "of 10. Be specific about gaps.",
         }
     }
 
 
-def load_architecture_context(state: AgentState) -> dict:
+async def load_architecture_context(state: AgentState) -> dict:
+    emit_step("retrieve")
     return {
         "context": {
-            "projects": PROJECTS_DETAIL,
-            "hint": "Describe architecture layers, components, and data flow. Offer the architecture widget.",
+            "retrieved": await retrieve_context(state["user_input"]),
+            "hint": "Describe architecture layers, components, and data flow. Offer the "
+            "architecture widget.",
         }
     }
 
 
-def load_general_context(state: AgentState) -> dict:
+async def load_general_context(state: AgentState) -> dict:
+    emit_step("retrieve")
     return {
         "context": {
-            "hint": "Answer from the profile data. Be conversational and helpful.",
+            "retrieved": await retrieve_context(state["user_input"]),
+            "hint": "Be conversational and helpful. If the retrieved content doesn't cover this, "
+            "say so honestly rather than guessing.",
         }
     }
 
 
-def _build_llm(s) -> BaseChatModel:  # type: ignore[no-untyped-def]
-    provider = s.llm_provider.lower()
-    if provider == "groq":
-        from langchain_groq import ChatGroq
-
-        if not s.groq_api_key:
-            raise ValueError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
-        llm = ChatGroq(
-            model=s.groq_model,
-            api_key=s.groq_api_key.get_secret_value(),
-            temperature=s.llm_temperature,
-        )
-    elif provider == "ollama":
-        from langchain_ollama import ChatOllama
-
-        llm = ChatOllama(
-            model=s.ollama_model,
-            base_url=s.ollama_base_url,
-            temperature=s.llm_temperature,
-        )
-    else:
-        # Default: anthropic
-        if not s.anthropic_api_key:
-            raise ValueError(
-                "ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic"
-            )
-        llm = ChatAnthropic(
-            model=s.anthropic_model,
-            api_key=s.anthropic_api_key.get_secret_value(),
-            max_tokens=s.llm_max_tokens,
-            temperature=s.llm_temperature,
-        )
-    return llm.bind_tools(TOOLS) if TOOLS else llm
-
-
-# ── Node: respond (calls LLM, extracts widgets, loops through tools) ─────────
+# ── Node: respond (calls the LLM, extracts widgets) ──────────────────────────
 #
 # state["messages"] already holds the full conversation (checkpointer loads
 # prior turns; the caller appends only the new HumanMessage before invoking).
-# On a loop-back from `tools`, it additionally holds the AIMessage that
-# requested the tool call(s) plus the ToolMessage result(s).
 
 
 async def respond(state: AgentState) -> dict:
-    s = get_settings()
-    llm = _build_llm(s)
+    emit_step("respond")
+    llm = build_llm(get_settings())
 
     context_block = ""
     if state.get("context"):
@@ -244,31 +188,7 @@ async def respond(state: AgentState) -> dict:
     lc_messages = [SystemMessage(content=system), *state["messages"]]
 
     ai_message = await llm.ainvoke(lc_messages)
-
-    if getattr(ai_message, "tool_calls", None):
-        # Mid-reasoning step — tools_condition routes this to the "tools" node next.
-        return {"messages": [ai_message]}
-
-    full_text = str(ai_message.content)
-
-    # Parse out any widget block
-    widgets: list[dict] = []
-    response_text = full_text
-
-    if "WIDGET:" in full_text:
-        parts = full_text.split("WIDGET:", 1)
-        response_text = parts[0].strip()
-        widget_raw = parts[1].strip()
-
-        try:
-            colon_idx = widget_raw.index(":")
-            widget_type = widget_raw[:colon_idx]
-            widget_data = json.loads(widget_raw[colon_idx + 1 :])
-            widgets = [
-                {"type": "widget", "widget_type": widget_type, "data": widget_data}
-            ]
-        except Exception as exc:
-            log.warning("widget.parse.error", error=str(exc), raw=widget_raw[:200])
+    response_text, widgets = parse_widget_block(str(ai_message.content))
 
     return {"messages": [ai_message], "response": response_text, "widgets": widgets}
 
@@ -295,7 +215,6 @@ def build_career_graph(checkpointer: BaseCheckpointSaver) -> StateGraph:
     builder.add_node("architecture", load_architecture_context)
     builder.add_node("general", load_general_context)
     builder.add_node("respond", respond)
-    builder.add_node("tools", ToolNode(TOOLS))
 
     # Entry
     builder.add_edge(START, "classify_intent")
@@ -314,12 +233,9 @@ def build_career_graph(checkpointer: BaseCheckpointSaver) -> StateGraph:
         },
     )
 
-    # All context nodes flow into respond
+    # All context nodes flow into respond, which is the final step
     for node in ("project", "skills", "resume", "jd_match", "architecture", "general"):
         builder.add_edge(node, "respond")
-
-    # respond -> tools (if the LLM requested a tool call) -> back to respond, else END
-    builder.add_conditional_edges("respond", tools_condition)
-    builder.add_edge("tools", "respond")
+    builder.add_edge("respond", END)
 
     return builder.compile(checkpointer=checkpointer)

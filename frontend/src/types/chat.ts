@@ -15,11 +15,20 @@ export interface Widget {
   data: Record<string, unknown>;
 }
 
+export type StepStatus = "running" | "done";
+
+export interface Step {
+  id: string;
+  label: string;
+  status: StepStatus;
+}
+
 export interface Message {
   id: string;
   role: Role;
   content: string;
   widgets?: Widget[];
+  steps?: Step[];
   isStreaming?: boolean;
   timestamp: Date;
 }

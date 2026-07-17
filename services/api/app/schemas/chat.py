@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from core.models.base import AppModel
 
@@ -27,7 +27,21 @@ class ChatResponse(AppModel):
 
 # ── SSE event types sent to the frontend ──────────────────────────────────────
 
+class SSEStep(AppModel):
+    type: Literal["step"] = "step"
+    id: str
+    label: str
+    status: str
+
+
 class SSEToken(AppModel):
+    # AppModel's str_strip_whitespace=True is right for user-submitted fields (see
+    # ChatRequest above) but wrong here: `content` is a raw streamed token delta where
+    # a leading/trailing space is semantically significant (a word boundary) — a
+    # space-only token would otherwise be silently stripped to "", vanishing entirely
+    # and jamming words together on the client.
+    model_config = ConfigDict(str_strip_whitespace=False)
+
     type: Literal["token"] = "token"
     content: str
 

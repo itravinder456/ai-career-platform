@@ -8,7 +8,15 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.clients.http import get_http_client
 from app.dependencies.settings import Settings
-from app.schemas.chat import ChatRequest, SSEDone, SSEError, SSEToken, SSEWidget, SessionClearRequest
+from app.schemas.chat import (
+    ChatRequest,
+    SessionClearRequest,
+    SSEDone,
+    SSEError,
+    SSEStep,
+    SSEToken,
+    SSEWidget,
+)
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)
@@ -69,7 +77,14 @@ async def _stream(body: ChatRequest, settings: Settings) -> AsyncGenerator[str, 
 
                 event_type = event.get("type")
 
-                if event_type == "token":
+                if event_type == "step":
+                    yield SSEStep(
+                        id=event.get("id", ""),
+                        label=event.get("label", ""),
+                        status=event.get("status", "running"),
+                    ).model_dump_json()
+
+                elif event_type == "token":
                     content = event.get("content", "")
                     yield SSEToken(content=content).model_dump_json()
 

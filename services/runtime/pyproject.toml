@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "python-dotenv>=1.2.2",
+    "qdrant-client>=1.18.0",
     "ravinder-ai-core",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.51.0",
@@ -35,6 +36,10 @@ target-version = "py312"
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [

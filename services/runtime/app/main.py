@@ -15,7 +15,9 @@ from fastapi import FastAPI
 from app.api.v1 import health, run
 from app.graphs.career import build_career_graph
 from app.memory import close_checkpointer, init_checkpointer
+from app.tools.retrieval import close_qdrant
 from core.config import get_settings
+from core.embeddings import close_embedder
 from core.exceptions import register_exception_handlers
 from core.logging.setup import configure_logging, get_logger
 
@@ -32,6 +34,8 @@ async def lifespan(app: FastAPI):
     log.info("runtime.startup", model=_settings.anthropic_model)
     yield
     await close_checkpointer()
+    await close_qdrant()
+    await close_embedder()
     log.info("runtime.shutdown")
 
 

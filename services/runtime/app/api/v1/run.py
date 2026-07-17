@@ -1,14 +1,15 @@
 """
 POST   /api/v1/run             — internal endpoint called by services/api.
-                                  Runs the LangGraph career graph for one turn,
-                                  streams tokens and widget events back via SSE.
-                                  Conversation history is loaded/saved automatically
-                                  by the graph's checkpointer, keyed by session_id.
+                                  Streams the LangGraph career graph for one turn over SSE:
+                                  step events (progress), token events (incremental answer),
+                                  an optional widget event, then done. History is loaded/saved
+                                  automatically by the checkpointer, keyed by session_id.
 DELETE /api/v1/run/{session_id} — clears that conversation's checkpoint state.
 """
 
 import json
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import StreamingResponse
@@ -16,6 +17,7 @@ from langchain_core.messages import HumanMessage
 from pydantic import Field
 
 from app.state.agent_state import AgentState
+from app.streaming import TokenWidgetSplitter
 from core.logging.setup import get_logger
 from core.models.base import AppModel
 
@@ -52,13 +54,25 @@ def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
+def _normalize_content(content: Any) -> str:
+    """LLM chunk content is usually a str delta, but some providers (e.g. Anthropic)
+    stream a list of content blocks — join their text parts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            part.get("text", "") if isinstance(part, dict) else str(part) for part in content
+        )
+    return ""
+
+
 async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, None]:
     log.info("run.start", session_id=body.session_id, message_preview=body.message[:80])
 
     career_graph = request.app.state.career_graph
 
-    # Only the new turn goes in — the checkpointer loads prior messages for
-    # this thread_id and merges this HumanMessage in via the add_messages reducer.
+    # Only the new turn goes in — the checkpointer loads prior messages for this
+    # thread_id and merges this HumanMessage in via the add_messages reducer.
     initial_state: AgentState = {
         "messages": [HumanMessage(content=body.message)],
         "session_id": body.session_id,
@@ -69,17 +83,28 @@ async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, Non
         "widgets": [],
     }
     config = {"configurable": {"thread_id": body.session_id}}
+    splitter = TokenWidgetSplitter()
 
     try:
-        # Run graph to completion — respond node strips WIDGET from response_text
-        # and stores it in state["widgets"]. We then emit clean text + widgets.
-        final_state: AgentState = await career_graph.ainvoke(initial_state, config=config)
+        # "custom" carries emit_step() progress events; "messages" carries LLM token
+        # deltas. Only the respond node's tokens are the user-facing answer.
+        async for mode, payload in career_graph.astream(
+            initial_state, config=config, stream_mode=["messages", "custom"]
+        ):
+            if mode == "custom":
+                yield _sse(payload)
+            elif mode == "messages":
+                chunk, meta = payload
+                if meta.get("langgraph_node") != "respond":
+                    continue
+                emit = splitter.feed(_normalize_content(chunk.content))
+                if emit:
+                    yield _sse({"type": "token", "content": emit})
 
-        response_text = final_state.get("response", "")
-        if response_text:
-            yield _sse({"type": "token", "content": response_text})
-
-        for widget in final_state.get("widgets", []):
+        trailing, widget = splitter.finish()
+        if trailing:
+            yield _sse({"type": "token", "content": trailing})
+        if widget:
             yield _sse(widget)
 
         yield _sse({"type": "done"})
@@ -87,4 +112,9 @@ async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, Non
 
     except Exception as exc:
         log.exception("run.error", session_id=body.session_id, error=str(exc))
-        yield _sse({"type": "error", "message": "Agent encountered an error. Please try again."})
+        yield _sse(
+            {
+                "type": "error",
+                "message": "Agent encountered an error. Please try again.",
+            }
+        )

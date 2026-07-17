@@ -1,8 +1,9 @@
-import { Widget } from "@/types/chat";
+import { Step, Widget } from "@/types/chat";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export interface StreamCallbacks {
+  onStep: (step: Step) => void;
   onToken: (token: string) => void;
   onWidget: (widget: Widget) => void;
   onDone: () => void;
@@ -56,6 +57,13 @@ export async function streamChat(
         try {
           const event = JSON.parse(raw) as Record<string, unknown>;
           switch (event.type) {
+            case "step":
+              callbacks.onStep({
+                id: event.id as string,
+                label: event.label as string,
+                status: (event.status as Step["status"]) ?? "running",
+              });
+              break;
             case "token":
               callbacks.onToken(event.content as string);
               break;
