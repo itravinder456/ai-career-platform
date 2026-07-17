@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence, useMotionValue, useSpring, useMotionTemplate } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+  useMotionTemplate,
+} from "framer-motion";
+import { FEATURED_QUESTIONS } from "@/lib/questions";
 import Particles from "./Particles";
 
 interface HeroProps {
-  onStart: () => void;
+  onStart: (question?: string) => void;
 }
 
 const ROTATING_TITLES = [
@@ -16,7 +23,7 @@ const ROTATING_TITLES = [
 ];
 
 const STATS = [
-  { value: "5+", label: "Years AI/ML" },
+  { value: "6+", label: "Years AI/ML" },
   { value: "10+", label: "Systems Shipped" },
   { value: "3", label: "LLM Frameworks" },
 ];
@@ -34,7 +41,10 @@ export default function Hero({ onStart }: HeroProps) {
   const gradBg = useMotionTemplate`radial-gradient(ellipse 80% 60% at ${springX}% ${springY}%, rgba(124,95,248,0.18) 0%, rgba(100,60,230,0.06) 40%, transparent 70%)`;
 
   useEffect(() => {
-    const id = setInterval(() => setTitleIndex((i) => (i + 1) % ROTATING_TITLES.length), 2600);
+    const id = setInterval(
+      () => setTitleIndex((i) => (i + 1) % ROTATING_TITLES.length),
+      2600,
+    );
     return () => clearInterval(id);
   }, []);
 
@@ -65,7 +75,8 @@ export default function Hero({ onStart }: HeroProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 30%, var(--bg) 100%)",
+          background:
+            "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 30%, var(--bg) 100%)",
         }}
       />
 
@@ -84,7 +95,8 @@ export default function Hero({ onStart }: HeroProps) {
           left: "50%",
           top: "48%",
           transform: "translate(-50%, -50%)",
-          background: "radial-gradient(ellipse, rgba(100,60,230,0.14) 0%, rgba(80,40,200,0.05) 45%, transparent 70%)",
+          background:
+            "radial-gradient(ellipse, rgba(100,60,230,0.14) 0%, rgba(80,40,200,0.05) 45%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(30px)",
         }}
@@ -98,7 +110,8 @@ export default function Hero({ onStart }: HeroProps) {
           height: 350,
           left: "-5%",
           top: "-5%",
-          background: "radial-gradient(circle, rgba(124,95,248,0.08) 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(124,95,248,0.08) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(60px)",
         }}
@@ -112,7 +125,8 @@ export default function Hero({ onStart }: HeroProps) {
           height: 280,
           right: "-2%",
           bottom: "5%",
-          background: "radial-gradient(circle, rgba(167,139,250,0.07) 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(167,139,250,0.07) 0%, transparent 70%)",
           borderRadius: "50%",
           filter: "blur(60px)",
         }}
@@ -130,19 +144,21 @@ export default function Hero({ onStart }: HeroProps) {
         {/* Status badge */}
         <motion.div variants={itemVariants}>
           <div
-            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
+            className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase p-4"
             style={{
               border: "1px solid rgba(124,95,248,0.35)",
               color: "var(--accent-2)",
               background: "rgba(124,95,248,0.08)",
               letterSpacing: "0.12em",
+              padding: "6px 16px",
             }}
           >
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{
                 background: "var(--green)",
-                boxShadow: "0 0 8px var(--green), 0 0 16px rgba(34,211,165,0.3)",
+                boxShadow:
+                  "0 0 8px var(--green), 0 0 16px rgba(34,211,165,0.3)",
                 animation: "pulse-glow 2s ease infinite",
               }}
             />
@@ -157,7 +173,8 @@ export default function Hero({ onStart }: HeroProps) {
             style={{
               lineHeight: 1.02,
               letterSpacing: "-0.03em",
-              background: "linear-gradient(160deg, #ffffff 0%, #e0d8ff 30%, #a78bfa 65%, #7c5ff8 100%)",
+              background:
+                "linear-gradient(160deg, #ffffff 0%, #e0d8ff 30%, #a78bfa 65%, #7c5ff8 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -169,7 +186,10 @@ export default function Hero({ onStart }: HeroProps) {
         </motion.div>
 
         {/* Rotating subtitle */}
-        <motion.div variants={itemVariants} className="h-7 overflow-hidden flex items-center">
+        <motion.div
+          variants={itemVariants}
+          className="h-7 overflow-hidden flex items-center"
+        >
           <AnimatePresence mode="wait">
             <motion.p
               key={titleIndex}
@@ -196,9 +216,12 @@ export default function Hero({ onStart }: HeroProps) {
         </motion.p>
 
         {/* CTA button */}
-        <motion.div variants={itemVariants} className="flex flex-col items-center gap-3 pt-1">
+        <motion.div
+          variants={itemVariants}
+          className="flex flex-col items-center gap-3 pt-1"
+        >
           <motion.button
-            onClick={onStart}
+            onClick={() => onStart()}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.97 }}
             transition={{ type: "spring", stiffness: 450, damping: 22 }}
@@ -208,14 +231,16 @@ export default function Hero({ onStart }: HeroProps) {
               background: "linear-gradient(135deg, #7c5ff8 0%, #a78bfa 100%)",
               color: "#fff",
               letterSpacing: "0.02em",
-              boxShadow: "0 0 0 1px rgba(124,95,248,0.4), 0 8px 32px rgba(124,95,248,0.4), 0 2px 8px rgba(0,0,0,0.3)",
+              boxShadow:
+                "0 0 0 1px rgba(124,95,248,0.4), 0 8px 32px rgba(124,95,248,0.4), 0 2px 8px rgba(0,0,0,0.3)",
             }}
           >
             {/* Animated shimmer on hover */}
             <span
               className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_0.7s_ease_forwards]"
               style={{
-                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)",
+                background:
+                  "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)",
               }}
             />
             <span className="relative z-10 flex items-center gap-2.5">
@@ -245,6 +270,22 @@ export default function Hero({ onStart }: HeroProps) {
           </p>
         </motion.div>
 
+        {/* Example question chips — deep-link into chat */}
+        <motion.div variants={itemVariants} className="hero-chips">
+          {FEATURED_QUESTIONS.map((q) => (
+            <motion.button
+              key={q}
+              type="button"
+              onClick={() => onStart(q)}
+              whileHover={{ scale: 1.04, y: -1 }}
+              whileTap={{ scale: 0.97 }}
+              className="hero-chip"
+            >
+              {q}
+            </motion.button>
+          ))}
+        </motion.div>
+
         {/* Stats */}
         <motion.div
           variants={itemVariants}
@@ -261,7 +302,8 @@ export default function Hero({ onStart }: HeroProps) {
                 <p
                   className="text-2xl font-bold tabular-nums leading-none"
                   style={{
-                    background: "linear-gradient(135deg, #fff 0%, #a78bfa 100%)",
+                    background:
+                      "linear-gradient(135deg, #fff 0%, #a78bfa 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -269,7 +311,10 @@ export default function Hero({ onStart }: HeroProps) {
                 >
                   {s.value}
                 </p>
-                <p className="text-xs mt-1.5 font-medium" style={{ color: "var(--text-muted)" }}>
+                <p
+                  className="text-xs mt-1.5 font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   {s.label}
                 </p>
               </div>

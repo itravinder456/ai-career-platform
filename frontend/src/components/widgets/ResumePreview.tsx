@@ -25,7 +25,7 @@ export default function ResumePreview({ data }: { data: ResumeData }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -1 }}
-      className="mt-3 rounded-xl p-5 space-y-4"
+      className="mt-3 rounded-xl p-5 space-y-5"
       style={{
         background: "rgba(255,255,255,0.03)",
         border: "1px solid var(--border)",
@@ -37,14 +37,17 @@ export default function ResumePreview({ data }: { data: ResumeData }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="flex items-start justify-between"
+        className="flex items-start justify-between gap-3"
       >
-        <div>
-          <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+        <div className="min-w-0 flex-1">
+          <h3
+            className="text-sm font-semibold truncate"
+            style={{ color: "var(--text-primary)" }}
+          >
             {data.name}
           </h3>
           <p
-            className="text-xs mt-0.5"
+            className="text-xs mt-0.5 truncate"
             style={{
               background: "linear-gradient(90deg, var(--accent-2) 0%, var(--accent-3) 100%)",
               WebkitBackgroundClip: "text",
@@ -60,11 +63,12 @@ export default function ResumePreview({ data }: { data: ResumeData }) {
           download
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.96 }}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0"
           style={{
             background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)",
             color: "#fff",
             boxShadow: "0 4px 12px rgba(108,92,231,0.3)",
+            whiteSpace: "nowrap",
           }}
         >
           <Download size={11} />

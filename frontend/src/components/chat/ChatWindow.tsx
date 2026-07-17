@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ArrowDown } from "lucide-react";
 import { Message, Widget } from "@/types/chat";
+import type { Step } from "@/types/chat";
 import { streamChat } from "@/services/chat";
-import { GREETING_TEXT, SUGGESTIONS } from "@/services/mockAI";
+import { GREETING_TEXT } from "@/services/mockAI";
+import { FEATURED_QUESTIONS, pickFollowUps } from "@/lib/questions";
 import { generateId } from "@/lib/utils";
 import MessageBubble from "./MessageBubble";
 import InputBar from "./InputBar";
+import FollowUpChips from "./FollowUpChips";
 
 const SESSION_KEY = "ai_session_id";
 
@@ -21,25 +25,45 @@ function getOrCreateSessionId(): string {
   return id;
 }
 
-export default function ChatWindow() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
+interface AskSignal {
+  q: string;
+  nonce: number;
+}
+
+interface Props {
+  askSignal?: AskSignal;
+  onBusyChange?: (busy: boolean) => void;
+}
+
+export default function ChatWindow({ askSignal, onBusyChange }: Props) {
+  const [greetingId] = useState(generateId);
+  const [messages, setMessages] = useState<Message[]>(() => [
+    { id: greetingId, role: "assistant", content: "", isStreaming: true, timestamp: new Date() },
+  ]);
+  const [isStreaming, setIsStreaming] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
+
   const sessionId = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
+  const isStreamingRef = useRef(true);
+  const queuedRef = useRef<string | null>(null);
+  const sendRef = useRef<(input: string) => void>(() => {});
 
   useEffect(() => {
     sessionId.current = getOrCreateSessionId();
   }, []);
 
-  // Animate the greeting locally — no backend round-trip needed.
-  // Cleanup resets state so React StrictMode's double-invocation restarts cleanly.
+  // Keep refs in sync for use inside effects/timers without stale closures.
   useEffect(() => {
-    const id = generateId();
-    setMessages([{ id, role: "assistant", content: "", isStreaming: true, timestamp: new Date() }]);
-    setIsStreaming(true);
-    setShowSuggestions(false);
+    isStreamingRef.current = isStreaming;
+    onBusyChange?.(isStreaming);
+  }, [isStreaming, onBusyChange]);
 
+  // Greeting typing animation — only the timer lives here; the message already exists.
+  useEffect(() => {
     let cancelled = false;
     let accumulated = "";
     const words = GREETING_TEXT.split(" ");
@@ -50,7 +74,7 @@ export default function ChatWindow() {
       if (i >= words.length) {
         clearInterval(timer);
         setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, content: accumulated, isStreaming: false } : m))
+          prev.map((m) => (m.id === greetingId ? { ...m, content: accumulated, isStreaming: false } : m))
         );
         setIsStreaming(false);
         setTimeout(() => { if (!cancelled) setShowSuggestions(true); }, 350);
@@ -58,7 +82,7 @@ export default function ChatWindow() {
       }
       accumulated += (i === 0 ? "" : " ") + words[i];
       setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, content: accumulated } : m))
+        prev.map((m) => (m.id === greetingId ? { ...m, content: accumulated } : m))
       );
       i++;
     }, 38);
@@ -66,20 +90,19 @@ export default function ChatWindow() {
     return () => {
       cancelled = true;
       clearInterval(timer);
-      setMessages([]);
-      setIsStreaming(false);
-      setShowSuggestions(false);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [greetingId]);
 
+  // Auto-scroll to the newest content, but only if the user is already near the bottom
+  // (so scrolling up to re-read isn't yanked back on every streamed token).
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (atBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const userHasSent = messages.some((m) => m.role === "user");
 
   const send = async (input: string) => {
-    if (isStreaming) return;
+    if (isStreamingRef.current) return;
     setShowSuggestions(false);
 
     const userMsg: Message = { id: generateId(), role: "user", content: input, timestamp: new Date() };
@@ -87,13 +110,26 @@ export default function ChatWindow() {
     const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg, aiMsg]);
     setIsStreaming(true);
+    // Jump to bottom on a fresh send regardless of prior scroll position.
+    atBottomRef.current = true;
+    setAtBottom(true);
 
     const collectedWidgets: Widget[] = [];
+    const allDone = (steps?: Step[]) => steps?.map((s) => ({ ...s, status: "done" as const }));
 
     await streamChat(sessionId.current, input, {
+      onStep: (step) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiId ? { ...m, steps: [...(allDone(m.steps) ?? []), step] } : m
+          )
+        );
+      },
       onToken: (token) => {
         setMessages((prev) =>
-          prev.map((m) => (m.id === aiId ? { ...m, content: m.content + token } : m))
+          prev.map((m) =>
+            m.id === aiId ? { ...m, content: m.content + token, steps: allDone(m.steps) } : m
+          )
         );
       },
       onWidget: (widget) => {
@@ -103,7 +139,12 @@ export default function ChatWindow() {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiId
-              ? { ...m, isStreaming: false, widgets: collectedWidgets.length ? collectedWidgets : undefined }
+              ? {
+                  ...m,
+                  isStreaming: false,
+                  steps: allDone(m.steps),
+                  widgets: collectedWidgets.length ? collectedWidgets : undefined,
+                }
               : m
           )
         );
@@ -122,23 +163,66 @@ export default function ChatWindow() {
     });
   };
 
+  // Keep the latest `send` in a ref (updated after commit, not during render) so the
+  // effects below can call it without stale closures — and this effect is declared
+  // before them, so the ref is current by the time they run in the same commit.
+  useEffect(() => {
+    sendRef.current = send;
+  });
+
+  // Externally-triggered questions (sidebar chips, Hero deep-link). If we're mid-stream
+  // or still animating the greeting, queue and flush once free.
+  useEffect(() => {
+    const q = askSignal?.q?.trim();
+    if (!q) return;
+    if (isStreamingRef.current) queuedRef.current = q;
+    else sendRef.current(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askSignal?.nonce]);
+
+  useEffect(() => {
+    if (!isStreaming && queuedRef.current) {
+      const q = queuedRef.current;
+      queuedRef.current = null;
+      sendRef.current(q);
+    }
+  }, [isStreaming]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const near = gap < 80;
+    atBottomRef.current = near;
+    setAtBottom(near);
+  };
+
+  const scrollToBottom = () => {
+    atBottomRef.current = true;
+    setAtBottom(true);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const askedLower = new Set(
+    messages.filter((m) => m.role === "user").map((m) => m.content.trim().toLowerCase())
+  );
+  const last = messages[messages.length - 1];
+  const showFollowUps =
+    !isStreaming &&
+    userHasSent &&
+    !!last &&
+    last.role === "assistant" &&
+    !last.isStreaming &&
+    !last.content.startsWith("Sorry, something went wrong");
+  const followUps = showFollowUps ? pickFollowUps(askedLower, 3) : [];
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        flex: "1 1 0px",
-        minHeight: 0,
-      }}
-    >
-      {/* Scrollable messages — flex-end so messages grow from the bottom */}
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", flex: "1 1 0px", minHeight: 0 }}>
+      {/* Scrollable messages */}
       <div
-        style={{
-          flex: "1 1 0px",
-          minHeight: 0,
-          overflowY: "auto",
-          overflowX: "hidden",
-        }}
+        ref={scrollRef}
+        onScroll={onScroll}
+        style={{ flex: "1 1 0px", minHeight: 0, overflowY: "auto", overflowX: "hidden" }}
       >
         <div
           style={{
@@ -146,7 +230,10 @@ export default function ChatWindow() {
             flexDirection: "column",
             justifyContent: "flex-end",
             minHeight: "100%",
-            padding: "32px 16px 16px",
+            width: "100%",
+            maxWidth: 760,
+            margin: "0 auto",
+            padding: "32px 20px 16px",
             gap: 20,
           }}
         >
@@ -155,27 +242,44 @@ export default function ChatWindow() {
               <MessageBubble key={msg.id} message={msg} />
             ))}
           </AnimatePresence>
+
+          {followUps.length > 0 && (
+            <FollowUpChips questions={followUps} onPick={send} disabled={isStreaming} />
+          )}
+
           <div ref={bottomRef} />
         </div>
       </div>
 
-      {/* Suggestions */}
+      {/* Scroll-to-bottom */}
+      <AnimatePresence>
+        {!atBottom && (
+          <motion.button
+            type="button"
+            onClick={scrollToBottom}
+            initial={{ opacity: 0, y: 8, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.9 }}
+            transition={{ duration: 0.18 }}
+            className="scroll-bottom-btn"
+            aria-label="Scroll to latest"
+          >
+            <ArrowDown size={16} strokeWidth={2.5} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile empty-state suggestions (sidebar carries these on desktop) */}
       <AnimatePresence>
         {showSuggestions && !userHasSent && (
           <motion.div
+            className="mobile-suggestions"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            style={{
-              flexShrink: 0,
-              padding: "0 16px 10px",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-            }}
           >
-            {SUGGESTIONS.map((s, i) => (
+            {FEATURED_QUESTIONS.map((s, i) => (
               <motion.button
                 key={s}
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -184,29 +288,7 @@ export default function ChatWindow() {
                 onClick={() => send(s)}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.96 }}
-                style={{
-                  borderRadius: 99,
-                  padding: "6px 14px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "var(--text-secondary)",
-                  background: "rgba(255,255,255,0.04)",
-                  cursor: "pointer",
-                  transition: "border-color 0.2s, color 0.2s, background 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget;
-                  el.style.borderColor = "rgba(124,95,248,0.5)";
-                  el.style.color = "var(--accent-2)";
-                  el.style.background = "rgba(124,95,248,0.07)";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget;
-                  el.style.borderColor = "rgba(255,255,255,0.08)";
-                  el.style.color = "var(--text-secondary)";
-                  el.style.background = "rgba(255,255,255,0.04)";
-                }}
+                className="mobile-suggestion-chip"
               >
                 {s}
               </motion.button>
@@ -216,7 +298,7 @@ export default function ChatWindow() {
       </AnimatePresence>
 
       {/* Input */}
-      <div style={{ flexShrink: 0, padding: "8px 16px 20px" }}>
+      <div style={{ flexShrink: 0, width: "100%", maxWidth: 760, margin: "0 auto", padding: "8px 20px 20px" }}>
         <InputBar onSend={send} disabled={isStreaming} />
         <p
           style={{
@@ -227,7 +309,8 @@ export default function ChatWindow() {
             letterSpacing: "0.01em",
           }}
         >
-          AI-powered · Responses based on Ravinder's profile
+          <span className="hint-desktop">Enter to send · Shift+Enter for a new line · </span>
+          Responses grounded in Ravinder&apos;s profile
         </p>
       </div>
     </div>

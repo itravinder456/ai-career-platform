@@ -31,13 +31,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   overflow: hidden;
 }
@@ -53,20 +56,36 @@ body {
 /* Dot grid background pattern — fine-grained for premium feel */
 .dot-grid {
   background-image:
-    radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px),
-    radial-gradient(circle, rgba(124,95,248,0.03) 1px, transparent 1px);
-  background-size: 28px 28px, 56px 56px;
-  background-position: 0 0, 14px 14px;
+    radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    radial-gradient(circle, rgba(124, 95, 248, 0.03) 1px, transparent 1px);
+  background-size:
+    28px 28px,
+    56px 56px;
+  background-position:
+    0 0,
+    14px 14px;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.09); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
 
 /* Selection */
-::selection { background: rgba(124, 95, 248, 0.28); color: var(--accent-3); }
+::selection {
+  background: rgba(124, 95, 248, 0.28);
+  color: var(--accent-3);
+}
 
 /* Gradient text utility */
 .gradient-text {
@@ -78,39 +97,71 @@ body {
 
 /* Shimmer sweep animation */
 @keyframes shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* Pulse glow for status dot */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 165, 0.5); }
-  50%       { box-shadow: 0 0 0 5px rgba(34, 211, 165, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 165, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(34, 211, 165, 0);
+  }
 }
 
 /* Spin for loader */
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Ambient aurora breathe */
 @keyframes aurora {
-  0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
-  50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.18); }
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.18);
+  }
 }
 
 /* Slow drift for secondary glows */
 @keyframes drift {
-  0%   { transform: translate(0, 0) scale(1); }
-  33%  { transform: translate(20px, -15px) scale(1.06); }
-  66%  { transform: translate(-12px, 10px) scale(0.96); }
-  100% { transform: translate(0, 0) scale(1); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(20px, -15px) scale(1.06);
+  }
+  66% {
+    transform: translate(-12px, 10px) scale(0.96);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
 }
 
 /* Fade up entrance */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Chat textarea placeholder */
@@ -120,6 +171,467 @@ body {
 }
 
 /* List marker color inside markdown */
-ol li::marker, ul li::marker {
+ol li::marker,
+ul li::marker {
   color: var(--accent-2);
+}
+
+/* ── GitHub-Flavored Markdown (react-markdown output) ─────────────────────────── */
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+.markdown-body > *:first-child {
+  margin-top: 0;
+}
+.markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p {
+  margin: 0 0 10px;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.markdown-body li {
+  margin: 0;
+}
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin: 4px 0 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  color: var(--text-primary);
+  font-weight: 650;
+  line-height: 1.35;
+  margin: 14px 0 8px;
+}
+.markdown-body h1 {
+  font-size: 1.3em;
+}
+.markdown-body h2 {
+  font-size: 1.18em;
+}
+.markdown-body h3 {
+  font-size: 1.05em;
+}
+.markdown-body h4 {
+  font-size: 0.95em;
+}
+
+.markdown-body strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.markdown-body em {
+  font-style: italic;
+}
+
+.markdown-body a {
+  color: var(--accent-3);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markdown-body a:hover {
+  color: var(--accent-2);
+}
+
+.markdown-body code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(124, 95, 248, 0.12);
+  color: var(--accent-3);
+  border: 1px solid rgba(124, 95, 248, 0.18);
+}
+.markdown-body pre {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.markdown-body pre code {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 0.82em;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--accent);
+  color: var(--text-muted);
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+
+.markdown-body table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0 0 10px;
+  font-size: 0.92em;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+.markdown-body th {
+  color: var(--text-primary);
+  font-weight: 600;
+  background: var(--surface);
+}
+
+/* ── Chat app shell ───────────────────────────────────────────────────────────── */
+/* Deliberately no `height` here — it stretches via flexbox's default
+   align-items:stretch from its parent (a plain, non-animated position:absolute;
+   inset:0 box in page.tsx). Pure flex-stretch, not percentage-height resolution:
+   more robust, and avoids a real browser bug where a percentage-height chain
+   rooted in a transform-animated element can get its computed height frozen at
+   an early/incorrect value (confirmed empirically — forcing a style recompute
+   in DevTools fixed it). Every level below keeps the same discipline. */
+.chat-shell {
+  display: flex;
+  width: 100%;
+  max-width: 1180px;
+  min-height: 0;
+  align-self: stretch;
+  margin: 0 auto;
+}
+.chat-main {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────────── */
+.chat-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 32px 16px 20px;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.sidebar-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 6px;
+}
+.sidebar-avatar {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5ff8 0%, #a78bfa 100%);
+  box-shadow: 0 2px 14px rgba(124, 95, 248, 0.4);
+}
+.sidebar-avatar-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 8px var(--green);
+}
+.sidebar-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.sidebar-role {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.sidebar-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-right: 2px;
+}
+.sidebar-topic {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-topic-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0 6px;
+  margin-bottom: 2px;
+}
+.sidebar-topic-chip {
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.sidebar-topic-chip:hover:not(:disabled) {
+  background: rgba(124, 95, 248, 0.08);
+  color: var(--text-primary);
+  border-color: rgba(124, 95, 248, 0.2);
+}
+.sidebar-topic-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-newchat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.sidebar-newchat:hover {
+  background: rgba(124, 95, 248, 0.1);
+  color: var(--text-primary);
+  border-color: rgba(124, 95, 248, 0.3);
+}
+.sidebar-socials {
+  display: flex;
+  gap: 8px;
+  padding: 0 2px;
+}
+.sidebar-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+.sidebar-social:hover {
+  color: var(--accent-2);
+  background: rgba(124, 95, 248, 0.08);
+  border-color: rgba(124, 95, 248, 0.25);
+}
+
+/* ── Follow-up chips ──────────────────────────────────────────────────────────── */
+.followup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.followup-chip:hover:not(:disabled) {
+  background: rgba(124, 95, 248, 0.09);
+  color: var(--accent-2);
+  border-color: rgba(124, 95, 248, 0.35);
+}
+.followup-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Scroll-to-bottom ─────────────────────────────────────────────────────────── */
+.scroll-bottom-btn {
+  position: absolute;
+  left: 50%;
+  margin-left: -18px;
+  bottom: 98px;
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  background: rgba(20, 18, 40, 0.9);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.scroll-bottom-btn:hover {
+  color: var(--accent-2);
+  border-color: rgba(124, 95, 248, 0.5);
+}
+
+/* ── Mobile empty-state suggestions (hidden on desktop; sidebar covers these) ──── */
+.mobile-suggestions {
+  display: none;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 0 20px 10px;
+}
+.mobile-suggestion-chip {
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s,
+    background 0.2s;
+}
+.mobile-suggestion-chip:hover {
+  border-color: rgba(124, 95, 248, 0.5);
+  color: var(--accent-2);
+  background: rgba(124, 95, 248, 0.07);
+}
+
+/* ── Hero example chips ───────────────────────────────────────────────────────── */
+.hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 460px;
+  padding-top: 2px;
+}
+.hero-chip {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 99px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    border-color 0.18s;
+}
+.hero-chip:hover {
+  background: rgba(124, 95, 248, 0.1);
+  color: var(--accent-2);
+  border-color: rgba(124, 95, 248, 0.4);
+}
+
+/* ── Responsive: collapse the shell to a single column ────────────────────────── */
+@media (max-width: 860px) {
+  .chat-sidebar {
+    display: none;
+  }
+  .mobile-suggestions {
+    display: flex;
+  }
+  .hint-desktop {
+    display: none;
+  }
+}
+
+/* ── Reduced motion: calm the ambient CSS animations ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
