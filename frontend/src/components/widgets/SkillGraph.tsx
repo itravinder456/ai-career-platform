@@ -28,7 +28,7 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
         style={{
           borderRadius: 14,
           padding: 1,
-          background: "linear-gradient(135deg, rgba(124,95,248,0.28) 0%, rgba(167,139,250,0.1) 50%, rgba(79,70,229,0.18) 100%)",
+          background: "linear-gradient(135deg, rgba(107,138,148,0.28) 0%, rgba(143,176,186,0.1) 50%, rgba(52,74,82,0.18) 100%)",
         }}
       >
         <motion.div
@@ -40,7 +40,7 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
             display: "flex",
             flexDirection: "column",
             gap: 14,
-            background: "linear-gradient(160deg, rgba(124,95,248,0.06) 0%, rgba(7,7,26,0.95) 60%)",
+            background: "linear-gradient(160deg, rgba(107,138,148,0.07) 0%, rgba(16,15,12,0.95) 60%)",
             backdropFilter: "blur(16px)",
             boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
             overflow: "hidden",
@@ -52,7 +52,7 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
               position: "absolute",
               top: 0, left: 0, right: 0,
               height: 2,
-              background: "linear-gradient(90deg, rgba(124,95,248,0.6), rgba(167,139,250,0.3), transparent)",
+              background: "linear-gradient(90deg, rgba(107,138,148,0.6), rgba(143,176,186,0.3), transparent)",
               pointerEvents: "none",
             }}
           />
@@ -87,7 +87,7 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
                       fontSize: 11,
                       fontFamily: "var(--font-geist-mono), monospace",
                       fontWeight: 600,
-                      color: "var(--accent-2)",
+                      color: "var(--wire-bright)",
                       minWidth: 34,
                       textAlign: "right",
                     }}
@@ -109,8 +109,8 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
                   style={{
                     height: "100%",
                     borderRadius: 99,
-                    background: "linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 65%, var(--accent-3) 100%)",
-                    boxShadow: "0 0 10px rgba(124,95,248,0.45)",
+                    background: "linear-gradient(90deg, var(--wire) 0%, var(--wire-bright) 100%)",
+                    boxShadow: "0 0 10px rgba(107,138,148,0.45)",
                   }}
                   initial={{ width: 0 }}
                   animate={{ width: `${skill.level}%` }}

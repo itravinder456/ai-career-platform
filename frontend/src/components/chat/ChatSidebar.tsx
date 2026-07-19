@@ -32,11 +32,11 @@ export default function ChatSidebar({ onAsk, onNewChat, busy }: Props) {
       {/* Identity */}
       <div className="sidebar-identity">
         <div className="sidebar-avatar">
-          R
+          RV
           <span className="sidebar-avatar-dot" />
         </div>
         <div>
-          <p className="sidebar-name">R.AI</p>
+          <p className="sidebar-name">RV.AI</p>
           <p className="sidebar-role">{profile?.headline ?? "Senior AI Platform Engineer"}</p>
         </div>
       </div>

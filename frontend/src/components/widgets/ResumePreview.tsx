@@ -67,7 +67,7 @@ export default function ResumePreview({ data }: { data: ResumeData }) {
           style={{
             background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)",
             color: "#fff",
-            boxShadow: "0 4px 12px rgba(108,92,231,0.3)",
+            boxShadow: "0 4px 12px rgba(201,122,61,0.3)",
             whiteSpace: "nowrap",
           }}
         >

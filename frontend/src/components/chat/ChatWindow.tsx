@@ -45,7 +45,6 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   const [atBottom, setAtBottom] = useState(true);
 
   const sessionId = useRef<string>("");
-  const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const isStreamingRef = useRef(true);
@@ -93,10 +92,20 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
     };
   }, [greetingId]);
 
+  // Scrolls only scrollRef itself (never bubbles a scroll request up to ancestors the
+  // way `element.scrollIntoView()` can — that walked up to the fixed app root, which
+  // has real scrollable overflow from the decorative background blobs, and nudged
+  // its scroll position instead of just this container's).
+  const scrollToEnd = (behavior: ScrollBehavior) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  };
+
   // Auto-scroll to the newest content, but only if the user is already near the bottom
   // (so scrolling up to re-read isn't yanked back on every streamed token).
   useEffect(() => {
-    if (atBottomRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (atBottomRef.current) scrollToEnd("smooth");
   }, [messages]);
 
   const userHasSent = messages.some((m) => m.role === "user");
@@ -200,7 +209,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   const scrollToBottom = () => {
     atBottomRef.current = true;
     setAtBottom(true);
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToEnd("smooth");
   };
 
   const askedLower = new Set(
@@ -246,8 +255,6 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
           {followUps.length > 0 && (
             <FollowUpChips questions={followUps} onPick={send} disabled={isStreaming} />
           )}
-
-          <div ref={bottomRef} />
         </div>
       </div>
 

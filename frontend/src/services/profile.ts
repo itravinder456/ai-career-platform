@@ -2,6 +2,11 @@ import { SocialId } from "@/lib/links";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+export interface ProfileStat {
+  label: string;
+  value: string;
+}
+
 export interface ProfileData {
   name: string;
   headline: string;
@@ -10,6 +15,7 @@ export interface ProfileData {
   summary: string | null;
   resumeUrl: string;
   links: { id: SocialId; href: string; label: string }[];
+  stats: ProfileStat[];
 }
 
 export async function fetchProfile(): Promise<ProfileData> {
@@ -29,5 +35,6 @@ export async function fetchProfile(): Promise<ProfileData> {
       href: l.url,
       label: l.label,
     })),
+    stats: data.stats,
   };
 }

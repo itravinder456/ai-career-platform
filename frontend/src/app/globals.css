@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #07071a;
-  --bg-2: #090920;
+  --bg: #100f0c;
+  --bg-2: #17150f;
   --surface: rgba(255, 255, 255, 0.035);
   --surface-2: rgba(255, 255, 255, 0.055);
   --surface-hover: rgba(255, 255, 255, 0.07);
@@ -11,17 +11,34 @@
   --text-primary: #eeeef5;
   --text-secondary: #8e8eac;
   --text-muted: #48486a;
-  --accent: #7c5ff8;
-  --accent-2: #a78bfa;
-  --accent-3: #c4b5fd;
-  --accent-glow: rgba(124, 95, 248, 0.15);
-  --accent-glow-bright: rgba(167, 139, 250, 0.22);
+  --accent: #c97a3d;
+  --accent-2: #e0925a;
+  --accent-3: #f0c9a3;
+  --accent-glow: rgba(201, 122, 61, 0.15);
+  --accent-glow-bright: rgba(224, 146, 90, 0.22);
   --green: #22d3a5;
   --green-glow: rgba(34, 211, 165, 0.2);
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+
+  /* ── Site-wide palette — warm ink + copper (human/action) / wire (system/AI) ──
+     --accent now IS copper (see above) — this block adds the finer-grained
+     tokens (--ink, --wire, --hero-*) used by the hero and by the copper/wire
+     split applied throughout chat: copper marks anything the user does or that
+     represents Ravinder (CTAs, user bubbles, brand mark); wire marks the system
+     responding (assistant bubbles, step trace, data widgets). */
+  --ink: #100f0c;
+  --ink-2: #17150f;
+  --copper: #c97a3d;
+  --copper-bright: #e0925a;
+  --wire: #6b8a94;
+  --wire-bright: #8fb0ba;
+  --hero-muted: #8a8578;
+  --hero-line: rgba(237, 232, 222, 0.1);
+  --hero-line-bright: rgba(237, 232, 222, 0.18);
+  --hero-surface: rgba(237, 232, 222, 0.035);
 }
 
 @theme inline {
@@ -42,7 +59,13 @@
 html,
 body {
   height: 100%;
-  overflow: hidden;
+  /* No overflow constraint here on purpose — this used to be `overflow: clip`,
+     which blocked scrolling on every route (not just the chat shell), breaking
+     normal page scroll on /admin. The chat/landing app's own root
+     (frontend/src/app/page.tsx) is `position: fixed; overflow: clip` on itself,
+     which is the properly-scoped fix for the scrollIntoView bug it was
+     protecting against — routes outside that fixed root (like /admin) need
+     ordinary document scroll and should never have it blocked at this level. */
 }
 
 body {
@@ -57,7 +80,7 @@ body {
 .dot-grid {
   background-image:
     radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    radial-gradient(circle, rgba(124, 95, 248, 0.03) 1px, transparent 1px);
+    radial-gradient(circle, rgba(201, 122, 61, 0.035) 1px, transparent 1px);
   background-size:
     28px 28px,
     56px 56px;
@@ -83,13 +106,13 @@ body {
 
 /* Selection */
 ::selection {
-  background: rgba(124, 95, 248, 0.28);
+  background: rgba(201, 122, 61, 0.28);
   color: var(--accent-3);
 }
 
 /* Gradient text utility */
 .gradient-text {
-  background: linear-gradient(135deg, #fff 10%, #c4b5fd 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, #fff 10%, #f0c9a3 50%, #e0925a 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -254,9 +277,9 @@ ul li::marker {
   font-size: 0.85em;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(124, 95, 248, 0.12);
+  background: rgba(201, 122, 61, 0.12);
   color: var(--accent-3);
-  border: 1px solid rgba(124, 95, 248, 0.18);
+  border: 1px solid rgba(201, 122, 61, 0.18);
 }
 .markdown-body pre {
   margin: 0 0 10px;
@@ -361,11 +384,11 @@ ul li::marker {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #7c5ff8 0%, #a78bfa 100%);
-  box-shadow: 0 2px 14px rgba(124, 95, 248, 0.4);
+  background: linear-gradient(135deg, var(--copper) 0%, var(--copper-bright) 100%);
+  box-shadow: 0 2px 14px rgba(201, 122, 61, 0.4);
 }
 .sidebar-avatar-dot {
   position: absolute;
@@ -432,9 +455,9 @@ ul li::marker {
     border-color 0.15s;
 }
 .sidebar-topic-chip:hover:not(:disabled) {
-  background: rgba(124, 95, 248, 0.08);
+  background: rgba(201, 122, 61, 0.08);
   color: var(--text-primary);
-  border-color: rgba(124, 95, 248, 0.2);
+  border-color: rgba(201, 122, 61, 0.2);
 }
 .sidebar-topic-chip:disabled {
   opacity: 0.4;
@@ -467,9 +490,9 @@ ul li::marker {
     border-color 0.15s;
 }
 .sidebar-newchat:hover {
-  background: rgba(124, 95, 248, 0.1);
+  background: rgba(201, 122, 61, 0.1);
   color: var(--text-primary);
-  border-color: rgba(124, 95, 248, 0.3);
+  border-color: rgba(201, 122, 61, 0.3);
 }
 .sidebar-socials {
   display: flex;
@@ -493,8 +516,8 @@ ul li::marker {
 }
 .sidebar-social:hover {
   color: var(--accent-2);
-  background: rgba(124, 95, 248, 0.08);
-  border-color: rgba(124, 95, 248, 0.25);
+  background: rgba(201, 122, 61, 0.08);
+  border-color: rgba(201, 122, 61, 0.25);
 }
 
 /* ── Follow-up chips ──────────────────────────────────────────────────────────── */
@@ -516,9 +539,9 @@ ul li::marker {
     border-color 0.15s;
 }
 .followup-chip:hover:not(:disabled) {
-  background: rgba(124, 95, 248, 0.09);
+  background: rgba(201, 122, 61, 0.09);
   color: var(--accent-2);
-  border-color: rgba(124, 95, 248, 0.35);
+  border-color: rgba(201, 122, 61, 0.35);
 }
 .followup-chip:disabled {
   opacity: 0.5;
@@ -539,7 +562,7 @@ ul li::marker {
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
-  background: rgba(20, 18, 40, 0.9);
+  background: rgba(23, 21, 15, 0.9);
   border: 1px solid var(--border-bright);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
   cursor: pointer;
@@ -550,7 +573,7 @@ ul li::marker {
 }
 .scroll-bottom-btn:hover {
   color: var(--accent-2);
-  border-color: rgba(124, 95, 248, 0.5);
+  border-color: rgba(201, 122, 61, 0.5);
 }
 
 /* ── Mobile empty-state suggestions (hidden on desktop; sidebar covers these) ──── */
@@ -577,28 +600,27 @@ ul li::marker {
     background 0.2s;
 }
 .mobile-suggestion-chip:hover {
-  border-color: rgba(124, 95, 248, 0.5);
+  border-color: rgba(201, 122, 61, 0.5);
   color: var(--accent-2);
-  background: rgba(124, 95, 248, 0.07);
+  background: rgba(201, 122, 61, 0.07);
 }
 
 /* ── Hero example chips ───────────────────────────────────────────────────────── */
 .hero-chips {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
-  max-width: 460px;
   padding-top: 2px;
 }
 .hero-chip {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 99px;
-  padding: 7px 14px;
+  font-family: var(--font-tech), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+  color: var(--hero-muted);
+  background: rgba(237, 232, 222, 0.03);
+  border: 1px solid var(--hero-line);
+  border-radius: 7px;
+  padding: 7px 13px;
   cursor: pointer;
   transition:
     background 0.18s,
@@ -606,9 +628,246 @@ ul li::marker {
     border-color 0.18s;
 }
 .hero-chip:hover {
-  background: rgba(124, 95, 248, 0.1);
-  color: var(--accent-2);
-  border-color: rgba(124, 95, 248, 0.4);
+  background: rgba(201, 122, 61, 0.1);
+  color: var(--copper-bright);
+  border-color: rgba(201, 122, 61, 0.4);
+}
+
+/* ── Hero redesign — identity + live runtime graph ─────────────────────────────
+   Distinct from the app's --accent (violet) palette on purpose; see the token
+   comment near --ink above. Scoped to the landing Hero only for now. */
+.hero2 {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.hero2-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+  gap: 56px;
+  align-items: center;
+}
+.hero2-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-tech), monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--hero-muted);
+  margin-bottom: 24px;
+}
+.hero2-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--copper);
+  box-shadow: 0 0 0 3px rgba(201, 122, 61, 0.2);
+  animation: pulse-glow-copper 2.4s ease-in-out infinite;
+}
+@keyframes pulse-glow-copper {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.hero2-name {
+  font-family: var(--font-display), serif;
+  font-weight: 600;
+  font-size: clamp(38px, 4.6vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+.hero2-role {
+  font-family: var(--font-tech), monospace;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  color: var(--wire-bright);
+  margin-top: 16px;
+  height: 18px;
+}
+.hero2-pitch {
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  max-width: 46ch;
+  margin-top: 20px;
+}
+.hero2-pitch strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.hero2-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.hero2-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-tech), monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--copper-bright), var(--copper));
+  padding: 13px 22px;
+  border: none;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  transition:
+    transform 0.15s ease,
+    filter 0.15s ease;
+}
+.hero2-cta:hover {
+  filter: brightness(1.08);
+}
+.hero2-cta svg {
+  transition: transform 0.15s ease;
+}
+.hero2-cta:hover svg {
+  transform: translateX(3px);
+}
+.hero2-cta-hint {
+  font-family: var(--font-tech), monospace;
+  font-size: 11px;
+  color: var(--hero-muted);
+}
+.hero2-chips-row {
+  margin-top: 16px;
+}
+.hero2-identity-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hero-line);
+}
+.hero2-portrait {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  overflow: hidden;
+  background: var(--ink-2);
+}
+.hero2-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(201, 122, 61, 0.45);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  pointer-events: none;
+}
+.hero2-identity-copy {
+  font-family: var(--font-tech), monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--hero-muted);
+}
+.hero2-identity-copy b {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.graph-panel {
+  position: relative;
+  border: 1px solid var(--hero-line);
+  background: var(--hero-surface);
+  padding: 20px 20px 14px;
+}
+.graph-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.graph-title {
+  font-family: var(--font-tech), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--hero-muted);
+  text-transform: uppercase;
+}
+.graph-title b {
+  color: var(--wire-bright);
+  font-weight: 600;
+}
+.graph-live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-tech), monospace;
+  font-size: 10px;
+  color: var(--copper-bright);
+  letter-spacing: 0.04em;
+}
+.graph-live .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--copper-bright);
+  animation: pulse-glow-copper 1.6s ease-in-out infinite;
+}
+.graph-canvas-wrap {
+  width: 100%;
+  height: 320px;
+}
+.graph-caption {
+  font-family: var(--font-tech), monospace;
+  font-size: 10px;
+  color: var(--hero-muted);
+  border-top: 1px solid var(--hero-line);
+  padding-top: 11px;
+  margin-top: 4px;
+  line-height: 1.6;
+}
+.graph-caption b {
+  color: var(--wire-bright);
+}
+
+.hero2-stats {
+  display: flex;
+  gap: 44px;
+  padding: 30px 0 0;
+  margin-top: 48px;
+  border-top: 1px solid var(--hero-line);
+}
+.hero2-stat b {
+  display: block;
+  font-family: var(--font-tech), monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.hero2-stat span {
+  font-family: var(--font-tech), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--hero-muted);
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .hero2-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .graph-canvas-wrap {
+    height: 260px;
+  }
 }
 
 /* ── Responsive: collapse the shell to a single column ────────────────────────── */
@@ -633,5 +892,63 @@ ul li::marker {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ── Admin page — responsive grids ─────────────────────────────────────────────
+   Fixed multi-column inline grids (previously plain style={{gridTemplateColumns}})
+   squeeze unusably narrow on phones — these collapse to one column below 640px. */
+.admin-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.admin-row-link {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.admin-row-stat {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .admin-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .admin-row-link {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "platform label" "url url" "delete delete";
+  }
+  .admin-row-link > :nth-child(1) {
+    grid-area: platform;
+  }
+  .admin-row-link > :nth-child(2) {
+    grid-area: label;
+  }
+  .admin-row-link > :nth-child(3) {
+    grid-area: url;
+  }
+  .admin-row-link > :nth-child(4) {
+    grid-area: delete;
+    justify-self: end;
+  }
+  .admin-row-stat {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "value delete" "label label";
+  }
+  .admin-row-stat > :nth-child(1) {
+    grid-area: value;
+  }
+  .admin-row-stat > :nth-child(2) {
+    grid-area: label;
+  }
+  .admin-row-stat > :nth-child(3) {
+    grid-area: delete;
+    justify-self: end;
   }
 }

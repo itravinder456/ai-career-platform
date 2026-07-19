@@ -41,12 +41,12 @@ export default function TechStack({ categories }: { categories: Category[] }) {
                 initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: ci * 0.08 + i * 0.04 + 0.1 }}
-                whileHover={{ scale: 1.05, borderColor: "rgba(108,92,231,0.5)" }}
+                whileHover={{ scale: 1.05, borderColor: "rgba(107,138,148,0.5)" }}
                 className="rounded-md px-2 py-0.5 text-xs font-medium cursor-default"
                 style={{
-                  background: "rgba(108,92,231,0.08)",
-                  color: "var(--accent-2)",
-                  border: "1px solid rgba(108,92,231,0.18)",
+                  background: "rgba(107,138,148,0.09)",
+                  color: "var(--wire-bright)",
+                  border: "1px solid rgba(107,138,148,0.2)",
                   transition: "border-color 0.2s ease",
                 }}
               >

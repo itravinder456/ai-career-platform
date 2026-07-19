@@ -7,6 +7,12 @@ export interface AdminSocialLink {
   display_order: number;
 }
 
+export interface AdminProfileStat {
+  label: string;
+  value: string;
+  display_order: number;
+}
+
 export interface AdminProfileUpdate {
   name?: string;
   headline?: string;
@@ -15,6 +21,7 @@ export interface AdminProfileUpdate {
   summary?: string | null;
   resume_url?: string;
   links?: AdminSocialLink[];
+  stats?: AdminProfileStat[];
 }
 
 export class AdminAuthError extends Error {}

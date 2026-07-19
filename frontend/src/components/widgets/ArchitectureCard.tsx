@@ -41,7 +41,7 @@ export default function ArchitectureCard({ layers }: { layers: Layer[] }) {
               <div className="h-px flex-1" style={{ background: "var(--border)" }} />
               <span
                 className="text-xs font-semibold whitespace-nowrap"
-                style={{ color: "var(--accent-2)" }}
+                style={{ color: "var(--wire-bright)" }}
               >
                 {layer.name}
               </span>

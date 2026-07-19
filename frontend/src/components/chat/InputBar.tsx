@@ -48,10 +48,10 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
         background: "rgba(255,255,255,0.04)",
         // Border via outline so it animates without layout shift
         outline: focused
-          ? "1.5px solid rgba(124,95,248,0.7)"
+          ? "1.5px solid rgba(201,122,61,0.7)"
           : "1px solid rgba(255,255,255,0.09)",
         boxShadow: focused
-          ? "0 0 0 3px rgba(124,95,248,0.1), 0 2px 16px rgba(0,0,0,0.3)"
+          ? "0 0 0 3px rgba(201,122,61,0.1), 0 2px 16px rgba(0,0,0,0.3)"
           : "0 2px 8px rgba(0,0,0,0.2)",
         transition: "outline 0.18s ease, box-shadow 0.18s ease",
       }}
@@ -116,13 +116,13 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
                 cy="8"
                 r="6"
                 fill="none"
-                stroke="rgba(167,139,250,0.25)"
+                stroke="rgba(143,176,186,0.25)"
                 strokeWidth="2"
               />
               <path
                 d="M8 2 A6 6 0 0 1 14 8"
                 fill="none"
-                stroke="#a78bfa"
+                stroke="#8fb0ba"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -150,11 +150,11 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
               border: "none",
               cursor: canSend ? "pointer" : "default",
               background: canSend
-                ? "linear-gradient(135deg, #7c5ff8 0%, #a78bfa 100%)"
+                ? "linear-gradient(135deg, var(--copper) 0%, var(--copper-bright) 100%)"
                 : "rgba(255,255,255,0.05)",
               color: "#fff",
               opacity: canSend ? 1 : 0.3,
-              boxShadow: canSend ? "0 4px 14px rgba(124,95,248,0.4)" : "none",
+              boxShadow: canSend ? "0 4px 14px rgba(201,122,61,0.4)" : "none",
               transition: "background 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease",
             }}
           >

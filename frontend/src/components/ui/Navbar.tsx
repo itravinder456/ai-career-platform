@@ -53,14 +53,14 @@ export default function Navbar({ state }: { state: AppState }) {
               color: "var(--text-primary)",
             }}
           >
-            R
+            RV
           </span>
           <span
             style={{
               fontSize: 14,
               fontWeight: 700,
               letterSpacing: "-0.02em",
-              background: "linear-gradient(135deg, #a78bfa, #c4b5fd)",
+              background: "linear-gradient(135deg, var(--copper-bright), var(--copper))",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",

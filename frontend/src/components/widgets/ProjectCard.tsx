@@ -36,7 +36,7 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
         style={{
           borderRadius: 14,
           padding: 1,
-          background: "linear-gradient(135deg, rgba(124,95,248,0.3) 0%, rgba(167,139,250,0.12) 50%, rgba(79,70,229,0.2) 100%)",
+          background: "linear-gradient(135deg, rgba(107,138,148,0.3) 0%, rgba(143,176,186,0.12) 50%, rgba(52,74,82,0.2) 100%)",
         }}
       >
         <motion.div
@@ -48,7 +48,7 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
             display: "flex",
             flexDirection: "column",
             gap: 14,
-            background: "linear-gradient(160deg, rgba(124,95,248,0.06) 0%, rgba(7,7,26,0.95) 60%)",
+            background: "linear-gradient(160deg, rgba(107,138,148,0.07) 0%, rgba(16,15,12,0.95) 60%)",
             backdropFilter: "blur(16px)",
             boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
             cursor: "default",
@@ -71,7 +71,7 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
                 right: 0,
                 height: 2,
                 borderRadius: "13px 13px 0 0",
-                background: "linear-gradient(90deg, rgba(124,95,248,0.6), rgba(167,139,250,0.3), transparent)",
+                background: "linear-gradient(90deg, rgba(107,138,148,0.6), rgba(143,176,186,0.3), transparent)",
                 pointerEvents: "none",
               }}
             />
@@ -121,7 +121,7 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
                     transition: "border-color 0.2s, color 0.2s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(124,95,248,0.4)";
+                    e.currentTarget.style.borderColor = "rgba(201,122,61,0.4)";
                     e.currentTarget.style.color = "var(--accent-2)";
                   }}
                   onMouseLeave={(e) => {
@@ -159,11 +159,11 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
                       gap: 6,
                       borderRadius: 8,
                       padding: "8px 10px",
-                      background: "rgba(124,95,248,0.06)",
-                      border: "1px solid rgba(124,95,248,0.12)",
+                      background: "rgba(107,138,148,0.07)",
+                      border: "1px solid rgba(107,138,148,0.14)",
                     }}
                   >
-                    <Zap size={11} style={{ color: "var(--accent-2)", flexShrink: 0, marginTop: 1 }} />
+                    <Zap size={11} style={{ color: "var(--wire-bright)", flexShrink: 0, marginTop: 1 }} />
                     <span style={{ fontSize: 11.5, lineHeight: 1.45, color: "var(--text-secondary)" }}>{imp}</span>
                   </div>
                 ))}
@@ -183,9 +183,9 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
                     padding: "3px 9px",
                     fontSize: 11,
                     fontWeight: 600,
-                    background: "rgba(124,95,248,0.09)",
-                    color: "var(--accent-3)",
-                    border: "1px solid rgba(124,95,248,0.18)",
+                    background: "rgba(107,138,148,0.1)",
+                    color: "var(--wire-bright)",
+                    border: "1px solid rgba(107,138,148,0.2)",
                     letterSpacing: "0.01em",
                   }}
                 >

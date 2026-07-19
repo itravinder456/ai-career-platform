@@ -42,7 +42,10 @@ export default function Home() {
         position: "fixed",
         inset: 0,
         background: "var(--bg)",
-        overflow: "hidden",
+        // `clip`, not `hidden`: hidden still lets scrollIntoView()/focus programmatically
+        // scroll this box if it has any scrollable overflow (e.g. from the decorative
+        // absolutely-positioned blobs inside Hero) — clip forbids scrolling outright.
+        overflow: "clip",
       }}
     >
       <Navbar state={state} />
@@ -90,7 +93,7 @@ export default function Home() {
                 height: 520,
                 borderRadius: "50%",
                 background:
-                  "radial-gradient(ellipse, rgba(124,95,248,0.09) 0%, transparent 68%)",
+                  "radial-gradient(ellipse, rgba(201,122,61,0.09) 0%, transparent 68%)",
                 filter: "blur(55px)",
                 pointerEvents: "none",
                 animation: "drift 14s ease-in-out infinite",
@@ -106,7 +109,7 @@ export default function Home() {
                 height: 440,
                 borderRadius: "50%",
                 background:
-                  "radial-gradient(ellipse, rgba(79,70,229,0.07) 0%, transparent 68%)",
+                  "radial-gradient(ellipse, rgba(107,138,148,0.07) 0%, transparent 68%)",
                 filter: "blur(60px)",
                 pointerEvents: "none",
                 animation: "drift 18s ease-in-out infinite 6s",
@@ -122,7 +125,7 @@ export default function Home() {
                 height: 360,
                 borderRadius: "50%",
                 background:
-                  "radial-gradient(ellipse, rgba(124,95,248,0.05) 0%, transparent 70%)",
+                  "radial-gradient(ellipse, rgba(201,122,61,0.05) 0%, transparent 70%)",
                 filter: "blur(50px)",
                 pointerEvents: "none",
                 animation: "aurora 10s ease-in-out infinite 2s",
