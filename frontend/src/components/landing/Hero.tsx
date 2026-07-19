@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { FEATURED_QUESTIONS } from "@/lib/questions";
 import { useProfile } from "@/hooks/useProfile";
-import RuntimeGraph from "./RuntimeGraph";
+import GraphCarousel from "./GraphCarousel";
 
 interface HeroProps {
   onStart: (question?: string) => void;
+  onScroll?: (scrolled: boolean) => void;
 }
 
 const ROTATING_ROLES = [
@@ -30,7 +31,7 @@ const FALLBACK_STATS = [
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-export default function Hero({ onStart }: HeroProps) {
+export default function Hero({ onStart, onScroll }: HeroProps) {
   const { profile } = useProfile();
   const [roleIndex, setRoleIndex] = useState(0);
 
@@ -52,6 +53,7 @@ export default function Hero({ onStart }: HeroProps) {
     <div
       className="relative h-full w-full overflow-y-auto overflow-x-hidden dot-grid"
       style={{ background: "var(--ink)" }}
+      onScroll={(e) => onScroll?.(e.currentTarget.scrollTop > 4)}
     >
       {/* Bottom vignette so the dot-grid fades rather than hard-cuts */}
       <div
@@ -59,6 +61,36 @@ export default function Hero({ onStart }: HeroProps) {
         style={{
           background:
             "radial-gradient(ellipse 80% 60% at 50% 0%, transparent 40%, var(--ink) 100%)",
+        }}
+      />
+
+      {/* Ambient copper/wire glow — gives the graph panel something to sit in
+          instead of flat black, echoing the same dual-glow used behind the
+          chat's welcome card so both surfaces read as one visual language. */}
+      <div
+        aria-hidden
+        className="absolute pointer-events-none"
+        style={{
+          top: "8%",
+          right: "6%",
+          width: 640,
+          height: 640,
+          borderRadius: "50%",
+          background: "radial-gradient(ellipse, rgba(107,138,148,0.14) 0%, transparent 68%)",
+          filter: "blur(70px)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute pointer-events-none"
+        style={{
+          top: "38%",
+          left: "2%",
+          width: 480,
+          height: 480,
+          borderRadius: "50%",
+          background: "radial-gradient(ellipse, rgba(201,122,61,0.1) 0%, transparent 68%)",
+          filter: "blur(60px)",
         }}
       />
 
@@ -138,8 +170,11 @@ export default function Hero({ onStart }: HeroProps) {
             </div>
 
             <div className="hero2-identity-row">
-              <div className="hero2-portrait">
-                <Image src="/ravinder.jpg" alt="Ravinder Varikuppala" fill sizes="60px" style={{ objectFit: "cover" }} />
+              <div className="hero2-portrait-wrap">
+                <div className="hero2-portrait-glow" aria-hidden />
+                <div className="hero2-portrait">
+                  <Image src="/ravinder.jpg" alt="Ravinder Varikuppala" fill sizes="60px" style={{ objectFit: "cover" }} />
+                </div>
               </div>
               <div className="hero2-identity-copy">
                 <b>Shipping agentic AI systems</b> in production —<br />
@@ -148,25 +183,9 @@ export default function Hero({ onStart }: HeroProps) {
             </div>
           </motion.div>
 
-          {/* ── Live runtime graph ───────────────────────────────────── */}
-          <motion.div variants={itemVariants} className="graph-panel">
-            <div className="graph-panel-head">
-              <div className="graph-title">
-                <b>career_graph</b> · runtime.state
-              </div>
-              <div className="graph-live">
-                <span className="dot" />
-                LIVE
-              </div>
-            </div>
-            <div className="graph-canvas-wrap">
-              <RuntimeGraph />
-            </div>
-            <div className="graph-caption">
-              This is the actual LangGraph topology behind the chat — a classifier routes each
-              question to a retrieval node, grounded in the real resume, before it reaches{" "}
-              <b>respond</b>.
-            </div>
+          {/* ── Live runtime graph carousel ──────────────────────────── */}
+          <motion.div variants={itemVariants}>
+            <GraphCarousel />
           </motion.div>
         </div>
 

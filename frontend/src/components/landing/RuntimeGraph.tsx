@@ -2,45 +2,25 @@
 
 import { useEffect, useRef } from "react";
 
-// Mirrors the actual LangGraph topology in services/runtime/app/graphs/career.py —
-// classify_intent fans out to per-intent retrieval nodes, all converging on respond.
-// This is deliberately the real graph, not a generic decorative diagram.
-interface Node {
+// Generic node-graph renderer — draws edges + an animated pulse that travels
+// each `paths` entry in turn, looping forever. The actual topology (nodes,
+// edges, paths) is passed in as props so this one canvas can render any of
+// the real system graphs in graphTopologies.tsx, not just one hardcoded shape.
+export interface GraphNode {
   id: string;
   label: string;
   x: number;
   y: number;
   r: number;
 }
+export type GraphEdge = [string, string];
+export type GraphPath = string[];
 
-const NODES: Node[] = [
-  { id: "start", label: "start", x: 0.08, y: 0.5, r: 5 },
-  { id: "classify", label: "classify_intent", x: 0.34, y: 0.5, r: 7 },
-  { id: "project", label: "project", x: 0.64, y: 0.12, r: 6 },
-  { id: "skills", label: "skills", x: 0.64, y: 0.37, r: 6 },
-  { id: "resume", label: "resume", x: 0.64, y: 0.62, r: 6 },
-  { id: "jd_match", label: "jd_match", x: 0.64, y: 0.87, r: 6 },
-  { id: "respond", label: "respond", x: 0.92, y: 0.5, r: 7 },
-];
-
-const EDGES: [string, string][] = [
-  ["start", "classify"],
-  ["classify", "project"],
-  ["classify", "skills"],
-  ["classify", "resume"],
-  ["classify", "jd_match"],
-  ["project", "respond"],
-  ["skills", "respond"],
-  ["resume", "respond"],
-  ["jd_match", "respond"],
-];
-
-const PATHS: string[][] = [
-  ["start", "classify", "project", "respond"],
-  ["start", "classify", "skills", "respond"],
-  ["start", "classify", "resume", "respond"],
-  ["start", "classify", "jd_match", "respond"],
-];
+interface Props {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  paths: GraphPath[];
+}
 
 function bezierPoint(
   t: number,
@@ -59,7 +39,7 @@ function bezierPoint(
   return { x, y };
 }
 
-export default function RuntimeGraph() {
+export default function RuntimeGraph({ nodes, edges, paths }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -86,11 +66,11 @@ export default function RuntimeGraph() {
     window.addEventListener("resize", resize);
 
     const pad = 30;
-    const pos = (n: Node) => ({
+    const pos = (n: GraphNode) => ({
       x: pad + n.x * (W - pad * 2),
       y: pad + n.y * (H - pad * 2),
     });
-    const byId = (id: string) => NODES.find((n) => n.id === id)!;
+    const byId = (id: string) => nodes.find((n) => n.id === id)!;
 
     let raf = 0;
     let activePath = 0;
@@ -109,7 +89,7 @@ export default function RuntimeGraph() {
       // All edges, quiet.
       ctx.lineWidth = 1;
       ctx.strokeStyle = border;
-      for (const [a, b] of EDGES) {
+      for (const [a, b] of edges) {
         const pa = pos(byId(a));
         const pb = pos(byId(b));
         ctx.beginPath();
@@ -118,7 +98,7 @@ export default function RuntimeGraph() {
         ctx.stroke();
       }
 
-      const path = PATHS[activePath];
+      const path = paths[activePath];
       const segLen = 1 / (path.length - 1);
       const segIndex = Math.min(Math.floor(pulseProgress / segLen), path.length - 2);
       const segT = (pulseProgress - segIndex * segLen) / segLen;
@@ -158,7 +138,7 @@ export default function RuntimeGraph() {
       ctx.shadowBlur = 0;
 
       // Nodes + labels.
-      for (const n of NODES) {
+      for (const n of nodes) {
         const p = pos(n);
         const onActive = path.includes(n.id);
         ctx.beginPath();
@@ -188,7 +168,7 @@ export default function RuntimeGraph() {
       pulseProgress += 0.012;
       if (pulseProgress >= 1) {
         pulseProgress = 0;
-        activePath = (activePath + 1) % PATHS.length;
+        activePath = (activePath + 1) % paths.length;
       }
       draw();
       raf = requestAnimationFrame(tick);
@@ -199,7 +179,7 @@ export default function RuntimeGraph() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [nodes, edges, paths]);
 
   return <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />;
 }

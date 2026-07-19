@@ -10,6 +10,7 @@ import { GREETING_TEXT } from "@/services/mockAI";
 import { FEATURED_QUESTIONS, pickFollowUps } from "@/lib/questions";
 import { generateId } from "@/lib/utils";
 import MessageBubble from "./MessageBubble";
+import WelcomeCard from "./WelcomeCard";
 import InputBar from "./InputBar";
 import FollowUpChips from "./FollowUpChips";
 
@@ -237,7 +238,11 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
           style={{
             display: "flex",
             flexDirection: "column",
-            justifyContent: "flex-end",
+            // Centered for the bare greeting (nothing to anchor to yet, and
+            // bottom-anchoring leaves a stark empty void above one message on
+            // tall viewports); bottom-anchored once a real exchange is under
+            // way, so streamed tokens don't shift the scroll position.
+            justifyContent: userHasSent ? "flex-end" : "center",
             minHeight: "100%",
             width: "100%",
             maxWidth: 760,
@@ -247,9 +252,19 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
           }}
         >
           <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
-            ))}
+            {messages.map((msg) =>
+              !userHasSent && msg.id === greetingId ? (
+                <WelcomeCard
+                  key={msg.id}
+                  text={msg.content}
+                  streaming={msg.isStreaming ?? false}
+                  showChips={showSuggestions}
+                  onPick={send}
+                />
+              ) : (
+                <MessageBubble key={msg.id} message={msg} />
+              )
+            )}
           </AnimatePresence>
 
           {followUps.length > 0 && (

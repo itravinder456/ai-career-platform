@@ -421,6 +421,11 @@ ul li::marker {
   flex-direction: column;
   gap: 16px;
   padding-right: 2px;
+  /* Fades the last ~28px to transparent so a scrollable topic list doesn't
+     look like it just ends mid-section (e.g. Experience showing only one
+     question) — signals "there's more below" without extra JS/DOM. */
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
 }
 .sidebar-topic {
   display: flex;
@@ -576,6 +581,137 @@ ul li::marker {
   border-color: rgba(201, 122, 61, 0.5);
 }
 
+/* ── Chat empty-state welcome card ────────────────────────────────────────────── */
+.welcome-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.welcome-glow {
+  position: absolute;
+  inset: -70px -30px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 380px 260px at 20% 10%, rgba(201, 122, 61, 0.16), transparent 65%),
+    radial-gradient(ellipse 340px 240px at 84% 92%, rgba(107, 138, 148, 0.14), transparent 65%);
+  filter: blur(8px);
+}
+.welcome-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 600px;
+  padding: 44px 40px 34px;
+  border-radius: 20px;
+  border: 1px solid var(--hero-line-bright);
+  background: linear-gradient(165deg, rgba(237, 232, 222, 0.045) 0%, rgba(237, 232, 222, 0.015) 100%);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.welcome-portrait {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 22px;
+  flex-shrink: 0;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+  overflow: hidden;
+  background: var(--ink-2);
+}
+.welcome-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(201, 122, 61, 0.45);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+  pointer-events: none;
+}
+.welcome-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-tech), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--wire-bright);
+  margin-bottom: 16px;
+}
+.welcome-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-glow);
+  animation: pulse-glow-copper 2.4s ease-in-out infinite;
+}
+.welcome-headline {
+  font-family: var(--font-display), serif;
+  font-weight: 500;
+  font-size: clamp(18px, 2.3vw, 21px);
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+  max-width: 44ch;
+}
+.welcome-caret {
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--wire-bright);
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: caret-blink 0.9s step-end infinite;
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--hero-line);
+  width: 100%;
+}
+.welcome-chip {
+  font-family: var(--font-tech), monospace;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  color: var(--hero-muted);
+  background: rgba(237, 232, 222, 0.03);
+  border: 1px solid var(--hero-line);
+  border-radius: 8px;
+  padding: 9px 15px;
+  cursor: pointer;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    border-color 0.18s;
+}
+.welcome-chip:hover {
+  background: rgba(201, 122, 61, 0.1);
+  color: var(--copper-bright);
+  border-color: rgba(201, 122, 61, 0.4);
+}
+@media (max-width: 767px) {
+  .welcome-chips {
+    display: none;
+  }
+}
+
 /* ── Mobile empty-state suggestions (hidden on desktop; sidebar covers these) ──── */
 .mobile-suggestions {
   display: none;
@@ -618,6 +754,8 @@ ul li::marker {
   letter-spacing: 0.01em;
   color: var(--hero-muted);
   background: rgba(237, 232, 222, 0.03);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--hero-line);
   border-radius: 7px;
   padding: 7px 13px;
@@ -753,6 +891,19 @@ ul li::marker {
   padding-top: 24px;
   border-top: 1px solid var(--hero-line);
 }
+.hero2-portrait-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.hero2-portrait-glow {
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 122, 61, 0.25) 0%, transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
 .hero2-portrait {
   position: relative;
   width: 60px;
@@ -783,9 +934,16 @@ ul li::marker {
 
 .graph-panel {
   position: relative;
-  border: 1px solid var(--hero-line);
-  background: var(--hero-surface);
+  border: 1px solid var(--hero-line-bright);
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(237, 232, 222, 0.05) 0%, rgba(237, 232, 222, 0.02) 100%);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   padding: 20px 20px 14px;
+  overflow: hidden;
 }
 .graph-panel-head {
   display: flex;
@@ -835,6 +993,33 @@ ul li::marker {
 }
 .graph-caption b {
   color: var(--wire-bright);
+}
+
+/* carousel nav dots */
+.graph-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 14px 0 2px;
+}
+.graph-dot {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--hero-line-bright);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    background 0.25s ease,
+    width 0.25s ease;
+}
+.graph-dot:hover {
+  background: rgba(201, 122, 61, 0.4);
+}
+.graph-dot.active {
+  background: var(--copper-bright);
+  width: 22px;
 }
 
 .hero2-stats {
