@@ -15,6 +15,98 @@ and the world — autonomously.
 
 ---
 
+## Content & Document Architecture (Current + Planned)
+
+Two independent tracks, deliberately kept separate rather than merged into one datastore:
+
+**Track 1 — Structured facts (Postgres, `services/api`).** Anything the UI needs to render
+directly and predictably: the `profile`, `social_links`, and `profile_stats` tables
+(Alembic-migrated, `services/api/app/db/models/`). Owned and edited through the admin panel
+(`/admin`, key-gated via `ADMIN_SECRET_KEY`), read publicly via `GET /api/v1/profile`. This is the
+source for the landing page's name/headline/stats/links — `Profile` is deliberately the right
+tool here, not a document parsed at request time, because it needs to be fast, precisely
+renderable field-by-field, and directly editable without touching prose. The runtime's
+system-prompt identity block (`services/runtime/app/knowledge/profile.py`) reads this same table
+directly, so there is exactly one place that knows Ravinder's name, location, and links.
+
+An earlier pass also gave `experiences`/`projects`/`skills` this same structured, admin-CRUD
+treatment. That was removed: those are career *facts* (what Ravinder actually built, worked on,
+knows), which Track 2 below already covers via RAG over the real resume — a second, structured
+copy of the same facts risked drifting out of sync with the source of truth every time one was
+updated and the other wasn't. `profile`/`social_links`/`profile_stats` survive that cut because
+they have no RAG equivalent — nothing else knows the hero's stats or link URLs.
+
+**Track 2 — Narrative source documents (Qdrant, via `services/ingestion`).** Free-form written
+material — resume, project write-ups, blog posts, certificates — for the chat's deep/narrative
+answers ("walk me through your architecture", "why did you choose X"). Critically, this is a
+**two-stage pipeline, not a live read**:
+
+```
+data/{resume,projects,blogs,certificates}/  (files: .md, .txt, .pdf)
+        │
+        │  services/ingestion — offline, manual (`make ingest`)
+        │  load → chunk → embed → upsert
+        ▼
+    Qdrant (vector store)
+        │
+        │  services/runtime — online, per chat request
+        │  embed the query → semantic search → top-k chunks as LLM context
+        ▼
+   Chat response
+```
+
+`services/runtime` **never reads `data/` directly** and never talks to `services/ingestion` at
+request time — it only ever queries Qdrant. Ingestion is what turns raw files into searchable
+vectors, entirely offline, ahead of any chat request; runtime's retrieval tool
+(`app/tools/retrieval.py`) only knows how to search an already-populated Qdrant collection. If a
+file is added or edited under `data/` but `make ingest` hasn't been re-run, the chat simply won't
+know about the change — there is no fallback path that reads the file directly. See
+[docs/services/ingestion.md](./services/ingestion.md) for the pipeline itself and
+[docs/services/runtime.md](./services/runtime.md) for the retrieval tool.
+
+**Why two tracks, not one:** structured facts need to be fast and directly editable field-by-field
+— Postgres is the right tool. Narrative material needs semantic search over unstructured prose —
+a vector store is the right tool. Making one serve both jobs (rendering UI from parsed documents,
+or semantic search over structured rows) fights the grain of both.
+
+### Document source — current state
+
+Source files live in `data/{resume,projects,blogs,certificates}/` (markdown/text/PDF), read by
+`services/ingestion/app/loader.py` and embedded into Qdrant — never read by `services/runtime`
+directly (see the pipeline diagram above). Ingestion is triggered manually (`make ingest`) — no
+scheduler, no admin trigger yet. This is deliberate for now, not a gap: see
+[docs/services/ingestion.md](./services/ingestion.md)'s Known Gaps.
+
+### Document source — planned evolution
+
+1. **Move the storage backend from local disk to cloud storage** (Google Drive or similar). The
+   document bytes stop living in the git-adjacent `data/` folder; `services/ingestion` reads from
+   a backend-agnostic location instead of a hardcoded local path. The pipeline shape doesn't
+   change: ingestion is still the only thing that ever reads a raw document, still embeds into
+   Qdrant, and `services/runtime` still only ever queries Qdrant — swapping the storage backend
+   is invisible to runtime.
+2. **Introduce a `documents` metadata registry table in Postgres** — not the document content
+   itself (that stays in the storage backend), just the registry of *what exists*: `doc_type`,
+   title, storage backend (`local` | `drive` | ...), the backend-specific reference (a local path
+   today, a Drive file ID later), a content hash (to detect "has this actually changed since last
+   ingestion"), and `last_ingested_at`. This is the layer that makes "replace this file from the
+   admin panel" possible without needing to know the original filename — the admin panel resolves
+   "the resume" or "the X project write-up" to a stable row in this table, not a raw path.
+3. **Admin panel gains a Documents tab** — once the registry exists: list registered documents,
+   upload a new file to replace one in place (same `doc_type`/slug, new content), which updates
+   the registry row and flags it for re-ingestion.
+4. **Ingestion stays manual for now** — deliberately deferred, matching this project's existing
+   pattern of shipping one admin-panel entity at a time rather than building ahead of need.
+   Auto-triggering re-ingestion on upload, or on a schedule, is a natural next step once the
+   registry exists, not before.
+
+This mirrors the two-track split one level down: the `documents` table is itself a *structured
+fact* about a *narrative asset* — small, queryable metadata in Postgres, pointing at unstructured
+content wherever it actually lives. Not built yet — documented here as the agreed direction before
+implementation.
+
+---
+
 ## 2. Full System Architecture
 
 ```

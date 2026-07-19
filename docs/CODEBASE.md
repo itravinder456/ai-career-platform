@@ -106,15 +106,20 @@ services/api/
 │   ├── api/v1/
 │   │   ├── chat.py         POST /chat  →  proxy to runtime SSE (thin — no local session state)
 │   │   │                   POST /chat/clear  →  proxies to runtime DELETE /run/{session_id}
-│   │   └── health.py       GET /health  →  ping postgres + redis + qdrant
+│   │   ├── health.py       GET /health  →  ping postgres + redis + qdrant
+│   │   ├── admin.py        GET /admin/ping  →  validates X-Admin-Key, no side effects
+│   │   └── profile.py      GET/PUT /profile  →  singleton row + social_links + profile_stats
 │   ├── db/
-│   │   ├── postgres.py     asyncpg pool, init_db(), get_db()
+│   │   ├── postgres.py     asyncpg pool, init_db() (connectivity check only, never creates tables)
 │   │   ├── redis.py        redis.asyncio client, get_redis_client() — connection only, no chat use yet
-│   │   └── qdrant.py       qdrant-client, ensure_collection()
+│   │   ├── qdrant.py       qdrant-client, ensure_collection()
+│   │   └── models/         Profile, SocialLink, ProfileStat (SQLAlchemy)
 │   ├── middleware/
 │   │   └── logging.py      request/response structured logging
-│   ├── schemas/chat.py     Pydantic request/response models
-│   └── dependencies/       FastAPI Depends() wrappers for db/settings
+│   ├── schemas/            chat.py, profile.py
+│   ├── dependencies/       FastAPI Depends() wrappers for db/settings, plus auth.py (require_admin)
+│   └── alembic/            migrations — versions/ history includes projects/experiences/skills
+│                           tables being added, then removed once RAG covered the same facts
 ```
 
 Settings (`ApiSettings`) and exception handlers no longer live per-service — see
@@ -140,6 +145,41 @@ Conversation history lives entirely in runtime's LangGraph checkpointer (keyed b
 
 Returns `200` if all three pass, `206 Degraded` if any fail — includes the actual exception string per service for easier debugging.
 
+### Profile & admin flow (`app/api/v1/profile.py`)
+
+The only structured, admin-edited facts — as opposed to the narrative documents
+`services/ingestion` embeds for RAG — are the ones the landing page renders directly: name,
+headline, social links, hero stats. They live in Postgres and are edited through
+`frontend/src/app/admin/page.tsx`:
+
+```
+Browser (frontend/src/app/admin)
+  │ sessionStorage["admin_key"] holds the key after a one-time unlock
+  │ every mutating request sends it as X-Admin-Key
+  ▼
+services/api
+  │ GET  /api/v1/profile      — public, no auth
+  │ PUT  /api/v1/profile      — Depends(require_admin)
+  │   require_admin (app/dependencies/auth.py) compares X-Admin-Key to ADMIN_SECRET_KEY
+  │   via hmac.compare_digest — 401 UnauthorizedError on mismatch
+  ▼
+Postgres
+  profile (singleton, id=1) + social_links + profile_stats — PUT replaces links/stats wholesale
+```
+
+`services/runtime`'s system prompt (`app/knowledge/profile.py`) reads the same `profile` +
+`social_links` tables directly (a plain `psycopg` query, cached in-memory for 5 minutes) — so the
+chat's identity block and the admin-edited profile are always the same data, no sync step. The
+`resume`/`GET /api/v1/profile` field, in turn, is what points the frontend's `/resume` route at the
+actual PDF under `data/resume/` (see [ingestion.md](./services/ingestion.md) and
+`ARCHITECTURE.md`'s Content & Document Architecture for where that's headed next).
+
+**Note**: `experiences`/`projects`/`skills` used to exist here too, as structured admin-edited
+tables with full CRUD. They were removed — career facts (what Ravinder actually built, worked on,
+knows) come from RAG over `data/` documents, and a second structured copy of the same facts was
+redundant, risking drift from the real source of truth. `profile`/`social_links`/`profile_stats`
+remain because they back the landing page directly and have no RAG equivalent.
+
 ---
 
 ## 3. Runtime Service (`services/runtime/`)
@@ -154,7 +194,8 @@ services/runtime/
 │   │                           DELETE /run/{session_id}  →  clears that thread's checkpoint
 │   ├── graphs/career.py        LangGraph career graph (build_career_graph(checkpointer))
 │   ├── state/agent_state.py    TypedDict AgentState
-│   ├── knowledge/profile.py    PROFILE, PROJECTS_DETAIL, SKILLS_DETAIL, …
+│   ├── knowledge/profile.py    get_profile_text() — reads profile+social_links from Postgres directly,
+│   │                           5-min in-memory cache, falls back to a static string if Postgres is down
 │   └── memory/checkpointer.py  Postgres-backed AsyncPostgresSaver — conversation memory
 ```
 

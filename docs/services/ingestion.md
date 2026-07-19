@@ -135,6 +135,10 @@ To switch provider and/or model:
   identity-only (name/location/contact), so this collection is the sole source of career facts, not
   a supplement to hardcoded data.
 - Not wired into `docker-compose.yml` or a scheduler — must be run manually via `make ingest`.
+- Source files live on local disk (`data/`), not cloud storage, and there's no metadata registry
+  tracking what's been ingested vs. changed since — see `ARCHITECTURE.md`'s Content & Document
+  Architecture for the planned Drive + `documents` table evolution that would enable admin-panel
+  upload/replace and automatic re-ingestion.
 - `mypy --strict` on this service hits the same pre-existing `shared/core` "missing py.typed
   marker" gap documented in [shared-core.md](./shared-core.md) — not specific to this service.
 
