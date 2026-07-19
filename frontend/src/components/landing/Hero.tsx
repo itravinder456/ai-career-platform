@@ -181,7 +181,7 @@ export default function Hero({ onStart }: HeroProps) {
               filter: "drop-shadow(0 0 40px rgba(124,95,248,0.35))",
             }}
           >
-            Ravinder AI
+            R.AI
           </h1>
         </motion.div>
 
@@ -244,7 +244,7 @@ export default function Hero({ onStart }: HeroProps) {
               }}
             />
             <span className="relative z-10 flex items-center gap-2.5">
-              Talk with Me
+              Ask Ravinder
               <motion.svg
                 width="16"
                 height="16"

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Briefcase, Layers, Plus, Sparkles, Target } from "lucide-react";
-import { SOCIAL_LINKS } from "@/lib/links";
+import { useProfile } from "@/hooks/useProfile";
 import { TOPICS, TopicId } from "@/lib/questions";
 import { SocialIcon } from "@/components/ui/SocialIcons";
 
@@ -20,6 +20,8 @@ interface Props {
 }
 
 export default function ChatSidebar({ onAsk, onNewChat, busy }: Props) {
+  const { profile, links } = useProfile();
+
   return (
     <motion.aside
       className="chat-sidebar"
@@ -34,8 +36,8 @@ export default function ChatSidebar({ onAsk, onNewChat, busy }: Props) {
           <span className="sidebar-avatar-dot" />
         </div>
         <div>
-          <p className="sidebar-name">Ravinder AI</p>
-          <p className="sidebar-role">Senior AI Platform Engineer</p>
+          <p className="sidebar-name">R.AI</p>
+          <p className="sidebar-role">{profile?.headline ?? "Senior AI Platform Engineer"}</p>
         </div>
       </div>
 
@@ -69,7 +71,7 @@ export default function ChatSidebar({ onAsk, onNewChat, busy }: Props) {
           New chat
         </button>
         <div className="sidebar-socials">
-          {SOCIAL_LINKS.map((link) => (
+          {links.map((link) => (
             <a
               key={link.id}
               href={link.href}

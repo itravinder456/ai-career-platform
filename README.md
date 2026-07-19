@@ -79,5 +79,5 @@ Built by **Varikuppala Ravinder** — Senior AI Platform Engineer
 specializing in RAG pipelines, LangGraph agents, and MCP tooling.
 
 - 🌐 [ravinder.dev](https://ravinder.dev)
-- 💼 [LinkedIn](https://linkedin.com/in/ravinder-varikuppala)
-- 🐙 [GitHub](https://github.com/ravinder-varikuppala)
+- 💼 [LinkedIn](https://www.linkedin.com/in/varikuppala-ravinder/)
+- 🐙 [GitHub](https://github.com/itravinder456)

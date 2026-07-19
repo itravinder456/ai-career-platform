@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Ravinder AI — Runtime",
+    title="R.AI — Runtime",
     version="0.1.0",
     docs_url="/docs" if not _settings.is_production else None,
     redoc_url=None,

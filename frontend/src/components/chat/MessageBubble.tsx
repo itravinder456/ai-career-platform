@@ -93,7 +93,7 @@ export default function MessageBubble({ message }: { message: Message }) {
           )}
         </div>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.02em" }}>
-          Ravinder AI
+          R.AI
         </span>
       </div>
 

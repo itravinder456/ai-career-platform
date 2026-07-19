@@ -23,6 +23,11 @@ class AppError(Exception):
 
 @dataclass
 class NotFoundError(AppError):
+    # message is always derived from `resource` in __post_init__ below — the
+    # default here just satisfies dataclass field ordering (AppError.message has
+    # no default) so callers can write NotFoundError(resource="Project") without
+    # also passing a redundant message.
+    message: str = ""
     resource: str = "Resource"
     code: str = "NOT_FOUND"
     http_status: int = 404
@@ -68,6 +73,8 @@ class ServiceUnavailableError(AppError):
 @dataclass
 class UpstreamError(AppError):
     """Raised when an internal call (api → runtime) fails."""
+    # See NotFoundError above — message is derived from `service` below.
+    message: str = ""
     service: str = "unknown"
     code: str = "UPSTREAM_ERROR"
     http_status: int = 502

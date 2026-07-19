@@ -28,7 +28,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from app.core.llm import build_llm
-from app.prompts.career import BASE_SYSTEM, WIDGET_INSTRUCTION, parse_widget_block
+from app.prompts.career import WIDGET_INSTRUCTION, build_base_system, parse_widget_block
 from app.state.agent_state import AgentState, Intent
 from app.streaming import emit_step
 from app.tools.retrieval import retrieve_context
@@ -184,7 +184,8 @@ async def respond(state: AgentState) -> dict:
     if state.get("context"):
         context_block = f"\n\n--- CONTEXT ---\n{json.dumps(state['context'], indent=2)}"
 
-    system = BASE_SYSTEM + context_block + "\n\n" + WIDGET_INSTRUCTION
+    base_system = await build_base_system()
+    system = base_system + context_block + "\n\n" + WIDGET_INSTRUCTION
     lc_messages = [SystemMessage(content=system), *state["messages"]]
 
     ai_message = await llm.ainvoke(lc_messages)

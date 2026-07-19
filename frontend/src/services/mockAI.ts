@@ -122,7 +122,7 @@ const RESPONSES: Record<string, MockResponse> = {
             { company: "Infosys", role: "Software Engineer", duration: "2019 – 2022", highlight: "Backend microservices, API design" },
           ],
           education: "B.Tech Computer Science",
-          downloadUrl: "/resume.pdf",
+          downloadUrl: "/resume",
         },
       },
     ],

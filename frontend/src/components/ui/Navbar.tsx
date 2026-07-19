@@ -2,11 +2,12 @@
 
 import { motion } from "framer-motion";
 import { AppState } from "@/types/chat";
-import { SOCIAL_LINKS } from "@/lib/links";
+import { useProfile } from "@/hooks/useProfile";
 import { SocialIcon } from "@/components/ui/SocialIcons";
 
 export default function Navbar({ state }: { state: AppState }) {
   const inChat = state === "chat";
+  const { links } = useProfile();
 
   return (
     <header
@@ -52,7 +53,7 @@ export default function Navbar({ state }: { state: AppState }) {
               color: "var(--text-primary)",
             }}
           >
-            Ravinder
+            R
           </span>
           <span
             style={{
@@ -65,13 +66,13 @@ export default function Navbar({ state }: { state: AppState }) {
               backgroundClip: "text",
             }}
           >
-            .ai
+            .AI
           </span>
         </motion.a>
 
         {/* Nav links */}
         <nav style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {SOCIAL_LINKS.map(({ id, href, label, download }, i) => (
+          {links.map(({ id, href, label, download }, i) => (
             <motion.a
               key={label}
               href={href}

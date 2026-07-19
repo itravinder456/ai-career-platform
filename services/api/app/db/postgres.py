@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -42,9 +43,17 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def init_db() -> None:
+    """
+    Verifies Postgres is reachable at startup — does NOT create tables. Alembic
+    (see app/../alembic/) is the sole owner of schema; a stray `create_all` here
+    previously let any new SQLAlchemy model silently create its own table on the
+    next restart, bypassing migrations entirely and drifting out of sync with
+    what `alembic history` thinks has happened. Run `alembic upgrade head`
+    instead of relying on this to prepare a fresh database.
+    """
     engine = get_engine()
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("SELECT 1"))
 
 
 async def close_db() -> None:
