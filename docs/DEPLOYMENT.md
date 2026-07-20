@@ -193,8 +193,16 @@ and load `https://your-domain.example.com` in a browser.
 
 ## 7. Ingestion — populate the knowledge base
 
-Run this **from your own machine**, not the EC2 box — no need to deploy `ingestion` as a
-container for a job that only runs occasionally.
+Preferably run this **from your own machine**, not the EC2 box — no need to deploy
+`ingestion` as a container for a job that only runs occasionally. If you'd rather run it
+on the box anyway, install `uv` there first (it's not part of the earlier Docker/git/make
+setup, and the box doesn't need it for anything else):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+```
+`uv run` provisions a matching Python 3.12 itself if the box's default `python3` is
+older — no separate Python install needed either way.
 
 ```bash
 cp services/ingestion/.env.prod.example services/ingestion/.env.prod
