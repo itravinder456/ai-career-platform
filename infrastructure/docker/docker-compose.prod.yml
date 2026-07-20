@@ -35,11 +35,10 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
+    # No healthcheck override here — Dockerfile.runtime already defines a working one
+    # (Python urllib, not curl; neither this nor the api image installs curl, so a
+    # curl-based override here can never succeed — see docs/DEPLOYMENT.md Troubleshooting).
+    # Compose falls back to the image's own HEALTHCHECK when none is specified.
 
   # ── API gateway ────────────────────────────────────────────────────────────
   api:
@@ -57,11 +56,7 @@ services:
         condition: service_healthy
       runtime:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
+    # Same as runtime above — Dockerfile.api's own HEALTHCHECK (urllib, not curl) applies.
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:

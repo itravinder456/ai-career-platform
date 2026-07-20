@@ -36,4 +36,10 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/v1/health')"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
+# `python -m uvicorn`, not a bare `uvicorn` exec — the venv's console-script shebangs
+# (e.g. .venv/bin/uvicorn) are baked in by `uv sync` with the BUILDER stage's absolute
+# path (/build/services/runtime/.venv/...), which doesn't exist here after the .venv
+# COPY — execing them directly fails with "no such file or directory". `python` itself
+# has no such problem (it's a plain symlink, not a shebang script), and `python -m X`
+# activates the venv correctly via PATH + pyvenv.cfg regardless.
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]

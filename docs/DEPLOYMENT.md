@@ -275,6 +275,32 @@ ever surfaced on the first real production build. Fixed in the Dockerfile itself
 `adduser --system --ingroup app app` (`addgroup` already created the group the line
 before). Verified with a real local `docker build`, not just reasoned about.
 
+**`runtime` (and/or `api`) stuck `unhealthy`, blocking dependents from starting** — two
+independent bugs stack here, both real, both now fixed in the repo:
+
+1. `docker-compose.yml`'s and `docker-compose.prod.yml`'s `healthcheck:` for `runtime`/
+   `api` used `curl -sf http://localhost:.../api/v1/health || exit 1` — but neither
+   image installs `curl` (`python:3.12-slim` doesn't include it, and neither Dockerfile
+   adds it). The healthcheck command itself was un-runnable (`curl: not found`), so it
+   could never report healthy regardless of whether the app was actually fine.
+   `Dockerfile.{runtime,api}` already define a *working* `HEALTHCHECK` using Python's
+   `urllib` instead — fixed by simply deleting the broken compose-level override so the
+   image's own one applies (Compose only uses its own `healthcheck:` when one is given;
+   omitting it falls back to the image's `HEALTHCHECK`).
+2. Underneath that, the app was failing to start at all: `exec /app/.venv/bin/uvicorn:
+   no such file or directory`. `uv sync` (in the Dockerfile's builder stage) bakes the
+   *builder's own absolute path* into every console-script shebang under `.venv/bin/`
+   (e.g. `#!/build/services/runtime/.venv/bin/python`) — that path doesn't exist in the
+   final stage, where `.venv` gets `COPY`'d to `/app/.venv` instead, so directly `exec`ing
+   `uvicorn` fails. `python` itself has no such problem (it's a plain symlink, not a
+   shebang script) and correctly activates the venv via `PATH` + `pyvenv.cfg` regardless
+   of where it's invoked from. Fixed by changing both Dockerfiles' `CMD` from
+   `["uvicorn", ...]` to `["python", "-m", "uvicorn", ...]`.
+
+Both verified locally end-to-end: built the real image, ran it against a real (throwaway)
+Postgres container, and confirmed `docker inspect`'s `.State.Health.Status` actually
+reached `healthy` with a `0` exit code — not just inferred from reading the Dockerfiles.
+
 ---
 
 ## Redeploying after a code change

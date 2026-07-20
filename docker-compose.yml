@@ -73,11 +73,9 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
+    # No healthcheck override — Dockerfile.runtime's own HEALTHCHECK (Python urllib)
+    # already works; a curl-based override here can never succeed, since this image
+    # never installs curl. See docs/DEPLOYMENT.md's Troubleshooting section.
 
   # ── API gateway ────────────────────────────────────────────────────────────
   api:
@@ -103,11 +101,7 @@ services:
         condition: service_healthy
       runtime:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
+    # Same as runtime above — Dockerfile.api's own HEALTHCHECK applies instead.
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:
