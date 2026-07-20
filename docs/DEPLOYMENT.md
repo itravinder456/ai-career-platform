@@ -228,6 +228,55 @@ question and confirm the answer is actually grounded (not the
 
 ---
 
+## Troubleshooting — issues hit on the first deploy
+
+Everything below actually happened deploying to a fresh Amazon Linux 2023 box. Steps
+3/6-9 above already fold the fixes in inline (so a *new* deploy shouldn't hit these) —
+this section is for matching an exact symptom if something still goes wrong, or
+re-deploying on a box that was set up before this doc was updated.
+
+**`git: command not found`**
+Amazon Linux 2023's base AMI doesn't include git. Fix: `sudo dnf install -y git`
+(bundled into step 5's `dnf install -y git docker` above).
+
+**`sudo dnf install -y docker-compose-plugin` → "No match for argument:
+docker-compose-plugin"**
+Not a real package in AL2023's dnf repos, despite being the standard install path on
+Ubuntu/Debian. Fix: install the Compose v2 binary directly as a CLI plugin (step 6) —
+`curl` it from `docker/compose`'s GitHub releases into `~/.docker/cli-plugins/`.
+
+**`make: command not found`**
+Not preinstalled either. Fix: `sudo dnf install -y make`.
+
+**`unable to get image 'redis:7-alpine': permission denied while trying to connect to
+the docker API at unix:///var/run/docker.sock`**
+`usermod -aG docker $USER` only takes effect on a *new* login session — running it
+doesn't change the group of your *current* shell. Fix: `exit` and SSH back in (or
+`newgrp docker` to activate it without reconnecting, staying in that subshell). `sudo
+<command>` also works as an immediate one-off, since root bypasses the socket
+permission check entirely.
+
+**`compose build requires buildx 0.17.0 or later`**
+Same story as Compose — Buildx isn't a real AL2023 dnf package either. Fix: install it
+the same way, as a CLI-plugin binary (step 7). Note its release filenames use Go-style
+arch names (`amd64`/`arm64`), not `uname -m`'s (`x86_64`/`aarch64`) that the Compose
+step uses — the mapping is different between the two.
+
+**`target frontend: failed to solve: process "/bin/sh -c addgroup --system app &&
+adduser --system --group app" did not complete successfully: exit code: 1`**
+A real bug, not an environment gap — `Dockerfile.frontend` (`node:22-alpine`, so
+`adduser` is BusyBox's minimal implementation) used Debian-`adduser` syntax (`--system
+--group`, which auto-creates a matching group as one step). BusyBox has no `--group`
+long option; its equivalent is `--ingroup <existing-group>`, which requires the group to
+already exist. `Dockerfile.api`/`Dockerfile.runtime` were never affected — they're
+`python:3.12-slim` (Debian, real `adduser`). Local dev never caught this because `make
+dev-frontend` runs `npm run dev` directly, bypassing the Dockerfile entirely — this only
+ever surfaced on the first real production build. Fixed in the Dockerfile itself:
+`adduser --system --ingroup app app` (`addgroup` already created the group the line
+before). Verified with a real local `docker build`, not just reasoned about.
+
+---
+
 ## Redeploying after a code change
 
 ```bash
