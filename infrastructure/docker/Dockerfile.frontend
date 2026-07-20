@@ -12,7 +12,10 @@ RUN npm run build
 # ── Runtime stage ──────────────────────────────────────────────────────────────
 FROM node:22-alpine
 
-RUN addgroup --system app && adduser --system --group app
+# Alpine's adduser is BusyBox's, not Debian's — no --group long option (that's
+# Debian-adduser syntax, which auto-creates a matching group). BusyBox's equivalent is
+# --ingroup, which references a group that must already exist, hence addgroup first.
+RUN addgroup --system app && adduser --system --ingroup app app
 
 WORKDIR /app
 

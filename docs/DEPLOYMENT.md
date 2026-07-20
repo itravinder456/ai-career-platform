@@ -74,14 +74,49 @@ authenticated with an API key over HTTPS.
 2. Security group: 22 from your IP only, 80 + 443 from anywhere.
 3. Allocate and associate an **Elastic IP** so the address survives instance restarts.
 4. Point your domain's DNS `A` record at the Elastic IP.
-5. Install Docker + Compose plugin:
+5. Install git + Docker:
    ```bash
-   sudo dnf install -y docker
+   sudo dnf install -y git docker
    sudo systemctl enable --now docker
-   sudo usermod -aG docker $USER    # log out/in for this to take effect
-   sudo dnf install -y docker-compose-plugin
+   sudo usermod -aG docker $USER    # skip if you're operating as root; log out/in otherwise
    ```
-6. Clone the repo onto the box:
+6. Install the Compose v2 plugin — **not** available as a dnf package on Amazon Linux
+   2023 (`dnf install docker-compose-plugin` 404s; there's no such package in AL2023's
+   repos), so install the binary directly as AWS's own docs recommend:
+   ```bash
+   DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+   mkdir -p "$DOCKER_CONFIG/cli-plugins"
+   ARCH=$(uname -m); [ "$ARCH" = "aarch64" ] && ARCH=aarch64 || ARCH=x86_64
+   curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$ARCH" \
+     -o "$DOCKER_CONFIG/cli-plugins/docker-compose"
+   chmod +x "$DOCKER_CONFIG/cli-plugins/docker-compose"
+   docker compose version   # should print a version, not "command not found"
+   ```
+   `$HOME` here needs to be the home directory of whichever user actually runs
+   `docker compose` later (`/root` if you're root, `/home/ec2-user` otherwise) — if you
+   switch users after this step, repeat it for that user, or install into
+   `/usr/local/lib/docker/cli-plugins/` instead, which every user can see.
+7. Install the Buildx plugin — also missing from AL2023's repos, and `docker compose
+   build` (which `make prod-up` runs) needs it. Same CLI-plugin-binary approach, but
+   note Buildx's release assets use Go-style arch names (`amd64`/`arm64`), not
+   `uname -m`'s (`x86_64`/`aarch64`), so the mapping differs from the Compose step above:
+   ```bash
+   ARCH=$(uname -m); case "$ARCH" in aarch64) ARCH=arm64 ;; x86_64) ARCH=amd64 ;; esac
+   # Buildx's release filenames include the version, so "latest" needs the tag resolved
+   # first — unlike the Compose plugin above, there's no version-free filename to fall
+   # back on.
+   BUILDX_TAG=$(curl -sI https://github.com/docker/buildx/releases/latest \
+     | grep -i location | sed -E 's#.*/tag/(v[0-9.]+).*#\1#' | tr -d '\r')
+   curl -SL "https://github.com/docker/buildx/releases/download/$BUILDX_TAG/buildx-$BUILDX_TAG.linux-$ARCH" \
+     -o "$DOCKER_CONFIG/cli-plugins/docker-buildx"
+   chmod +x "$DOCKER_CONFIG/cli-plugins/docker-buildx"
+   docker buildx version   # should print a version, not "command not found"
+   ```
+   (Same `$DOCKER_CONFIG`/per-user caveat as the Compose plugin above.)
+8. If a login session already had `docker` group membership added mid-session (step 5),
+   it won't take effect until you reconnect — `exit` and SSH back in, or run
+   `newgrp docker` to activate it in the current shell, before continuing.
+9. Clone the repo onto the box:
    ```bash
    git clone <repo-url>
    cd AI-Career-Platform
