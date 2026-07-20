@@ -30,7 +30,7 @@ help:
 	@echo "    make logs-runtime    Tail runtime logs"
 	@echo "    make logs-frontend   Tail frontend logs"
 	@echo ""
-	@echo "  Production (see docs/DEPLOYMENT.md)"
+	@echo "  Production (see docs/ARCHITECTURE.md's Deployment section)"
 	@echo "    make prod-build      Build production images (infrastructure/docker/docker-compose.prod.yml)"
 	@echo "    make prod-up         Start the production stack (detached)"
 	@echo "    make prod-down       Stop and remove production containers"
@@ -117,7 +117,7 @@ logs-runtime:
 logs-frontend:
 	$(DOCKER_COMPOSE) logs -f frontend
 
-# ── Production (see docs/DEPLOYMENT.md) ─────────────────────────────────────────
+# ── Production (see docs/ARCHITECTURE.md's Deployment section) ──────────────────
 # Run these ON the deployed box, from the repo root — requires services/{api,runtime}
 # /.env.prod to already exist (copy from the .env.prod.example next to each) and
 # PUBLIC_API_URL set in the shell environment (e.g. export PUBLIC_API_URL=https://your-domain.example.com).

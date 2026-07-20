@@ -21,14 +21,15 @@ cd AI-Career-Platform
 
 ---
 
-## 2. Environment Files
+## 2. Environment files
 
 Copy each example and fill in real values:
 
 ```bash
-cp services/api/.env.example    services/api/.env
-cp services/runtime/.env.example services/runtime/.env
-cp frontend/.env.example         frontend/.env.local
+cp services/api/.env.example       services/api/.env
+cp services/runtime/.env.example   services/runtime/.env
+cp services/ingestion/.env.example services/ingestion/.env
+cp frontend/.env.example           frontend/.env.local
 ```
 
 **`services/api/.env`** — minimum required:
@@ -38,21 +39,35 @@ REDIS_URL=redis://localhost:6379
 QDRANT_URL=http://localhost:6333
 RUNTIME_URL=http://localhost:8001
 ADMIN_SECRET_KEY=<random-hex-32>   # python -c "import secrets; print(secrets.token_hex(32))"
-JWT_SECRET=<random-hex-32>
 ```
 
-**`services/runtime/.env`** — pick one LLM provider:
+**`services/runtime/.env`** — pick one LLM provider (defaults to `openai` if unset):
 ```env
-LLM_PROVIDER=groq                  # groq | anthropic | ollama
-GROQ_API_KEY=gsk_...               # free tier at console.groq.com
-GROQ_MODEL=llama-3.3-70b-versatile
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-mini
 
+# Or:
+# LLM_PROVIDER=groq
+# GROQ_API_KEY=gsk_...
+# GROQ_MODEL=llama-3.3-70b-versatile
+
+# LLM_PROVIDER=anthropic
 # ANTHROPIC_API_KEY=sk-ant-...
+
 # LLM_PROVIDER=ollama
 # OLLAMA_BASE_URL=http://localhost:11434
 # OLLAMA_MODEL=llama3.1
 
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/portfolio
 REDIS_URL=redis://localhost:6379
+QDRANT_URL=http://localhost:6333
+```
+
+**`services/ingestion/.env`** — needs an embedding provider (defaults to `openai`):
+```env
+EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=sk-...
 QDRANT_URL=http://localhost:6333
 ```
 
@@ -63,31 +78,30 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
-## 3. Start Infrastructure
+## 3. Start infrastructure
 
 ```bash
 make dev-infra
-# starts: postgres, redis, qdrant  (docker-compose profiles)
+# starts: postgres, redis, qdrant
 ```
 
 Verify all three are healthy:
 ```bash
 docker compose ps
-# postgres, redis, qdrant should all show "healthy"
 ```
 
 ---
 
-## 4. Install Dependencies
+## 4. Install dependencies
 
 ```bash
 make install
-# installs: uv sync for api + runtime + shared/core, npm install for frontend
+# uv sync for api + runtime + ingestion + shared/core, npm install for frontend
 ```
 
 ---
 
-## 5. Run Services (three terminals)
+## 5. Run services (three terminals)
 
 ```bash
 # Terminal 1 — API gateway (port 8000)
@@ -100,15 +114,32 @@ make dev-runtime
 make dev-frontend
 ```
 
+**Windows note**: `services/runtime` uses `psycopg`'s async mode, which can't run on
+Windows' default `ProactorEventLoop`. `make dev-runtime` runs `run_dev.py`, which sets
+`WindowsSelectorEventLoopPolicy` before starting uvicorn (a no-op on Linux/Docker) — don't
+swap this for a bare `uvicorn app.main:app --reload` on Windows.
+
 ---
 
-## 6. Verify
+## 6. Ingest the knowledge base
+
+Before the chat can answer anything grounded, Qdrant needs to actually have content in
+it — add source files under `data/{resume,projects,blogs,certificates}/` and run:
 
 ```bash
-# All infra + services healthy
+make ingest
+```
+
+This is a one-off offline step, not something the running services trigger themselves —
+re-run it any time `data/` changes.
+
+---
+
+## 7. Verify
+
+```bash
 curl http://localhost:8000/health
 
-# Quick chat test
 curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id": "test", "message": "What are your top skills?"}'
@@ -131,8 +162,6 @@ curl -X POST http://localhost:8000/api/v1/chat \
 
 ## Docker (full stack)
 
-To run everything in containers:
-
 ```bash
 make up        # build + start all services
 make logs      # tail all logs
@@ -141,14 +170,11 @@ make down      # stop + remove containers
 
 ---
 
-## Shared Core Changes
+## Shared core changes
 
-After editing anything under `shared/core/`, reinstall the package in both services:
+After editing anything under `shared/core/`, reinstall it in every dependent service —
+`uv` caches the built wheel, so plain `uv sync` won't pick up local changes:
 
 ```bash
-uv sync --reinstall-package ravinder-ai-core --directory services/api
-uv sync --reinstall-package ravinder-ai-core --directory services/runtime
+make sync-core
 ```
-
-This is required because uv caches the built wheel — the reinstall flag
-forces a fresh build from the local path.

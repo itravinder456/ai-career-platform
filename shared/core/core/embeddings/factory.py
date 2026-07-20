@@ -5,7 +5,7 @@ Mirrors services/runtime/app/graphs/career.py's _build_llm() pattern for chat LL
 openai/httpx are imported lazily inside the provider functions, not at module scope, so that
 importing this package doesn't force those dependencies onto any consumer that doesn't actually
 call embed_texts/embed_query — same reasoning as the lazy FastAPI import in
-core/exceptions/handlers.py (see docs/services/shared-core.md's Known Gaps).
+core/exceptions/handlers.py.
 """
 
 from core.config import get_settings

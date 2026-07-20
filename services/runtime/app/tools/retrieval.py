@@ -21,7 +21,7 @@ from core.logging.setup import get_logger
 log = get_logger(__name__)
 
 RESULT_LIMIT = 4
-CACHE_TTL_SECONDS = 24 * 60 * 60  # 24h — see docs/CACHING.md for why not permanent
+CACHE_TTL_SECONDS = 24 * 60 * 60  # 24h — see docs/ARCHITECTURE.md's Caching section
 
 _qdrant: AsyncQdrantClient | None = None
 
@@ -52,7 +52,8 @@ async def retrieve_context(query: str, limit: int = RESULT_LIMIT) -> str:
     """Core retrieval logic — called directly for mandatory context injection (career-
     related graph nodes) and wrapped as a tool below for the LLM's own follow-up calls.
 
-    Cached by normalized query text (see docs/CACHING.md) — RAG results for the same
+    Cached by normalized query text (see docs/ARCHITECTURE.md's Caching section) — RAG
+    results for the same
     question are deterministic and don't depend on conversation history, so this is safe
     to cache aggressively. Only successful lookups are cached; a transient Qdrant/
     embedding failure is never cached, so it can't get "stuck" serving a false

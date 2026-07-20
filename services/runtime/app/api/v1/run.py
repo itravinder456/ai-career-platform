@@ -73,7 +73,7 @@ def _normalize_content(content: Any) -> str:
     return ""
 
 
-MIN_CACHEABLE_WORDS = 4  # see docs/CACHING.md
+MIN_CACHEABLE_WORDS = 4  # see docs/ARCHITECTURE.md's Caching section
 
 
 def _is_cacheable_query(message: str) -> bool:

@@ -1,5 +1,6 @@
 """
-Redis-backed cache — see docs/CACHING.md for the design and rationale. Every function
+Redis-backed cache — see docs/ARCHITECTURE.md's Caching section for the design and
+rationale. Every function
 here degrades gracefully: a Redis outage (or REDIS_URL simply not being configured)
 falls back to "no cache" rather than breaking the caller, matching every other
 infra touchpoint in this service (app.tools.retrieval, app.executor.task_executor's

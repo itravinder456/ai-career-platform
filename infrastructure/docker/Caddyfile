@@ -1,9 +1,9 @@
 # {$DOMAIN} is substituted from the caddy service's environment (see
 # docker-compose.prod.yml) — set it in the shell before starting the stack:
 #   export DOMAIN=ai.ravindervarikuppala.com
-# Requires a real, publicly-resolvable DNS A record pointed at this box's Elastic IP
-# (see docs/DEPLOYMENT.md) — Caddy issues and renews the Let's Encrypt cert for it
-# automatically, no separate cert management needed.
+# Requires a real, publicly-resolvable DNS A record pointed at this box's Elastic IP —
+# Caddy issues and renews the Let's Encrypt cert for it automatically, no separate
+# cert management needed.
 {$DOMAIN} {
 	handle /api/* {
 		reverse_proxy api:8000

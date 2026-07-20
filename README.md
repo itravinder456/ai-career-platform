@@ -1,83 +1,87 @@
-# 🤖 Ravinder AI Career Platform
+# AI Career Platform
 
-> An AI-powered portfolio where recruiters chat with an intelligent
-> agent trained on my experience, projects, skills, and GitHub activity.
+An AI-powered portfolio where recruiters chat with an agent that actually knows the
+underlying career history in depth — projects, technical decisions, skills — and answers
+compound, specific questions instead of serving up a static resume.
 
-[![Live](https://img.shields.io/badge/Live-ravinder.dev-blue)](https://ravinder.dev)
-[![Tech](https://img.shields.io/badge/Stack-Next.js%20%7C%20FastAPI%20%7C%20LangGraph-green)]()
-[![AWS](https://img.shields.io/badge/Deployed-AWS%20ECS-orange)]()
-
----
-
-## 🎯 What Is This?
-
-Instead of a static portfolio, recruiters can:
-
-- 💬 **Chat** with an AI trained on my entire career history
-- 🔍 **Ask** about any project, skill, or experience
-- 📋 **Paste a JD** and get instant match score
-- 🎤 **Generate** interview questions based on my resume
-- 📊 **Get** architecture explanations with diagrams
+Live: **https://ai.ravindervarikuppala.com**
 
 ---
 
-## 🏗️ Architecture
+## What is this?
 
-```
-Next.js Frontend → FastAPI → LangGraph Agents → MCP Tools → RAG (Qdrant)
-```
+Instead of scrolling a resume, a recruiter or hiring manager talks to an agent that:
 
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for full details,
-[docs/CODEBASE.md](./docs/CODEBASE.md) for a request-by-request walkthrough, or
-[docs/services/](./docs/services/README.md) for a tradeoffs-and-gaps deep dive per service.
+- Answers questions about specific projects, technical decisions, and work history,
+  grounded in real source documents via RAG — not generated from guesswork
+- Breaks compound questions into sub-tasks and answers each part in parallel
+  (`what have you built, what's your stack, and are you a fit for this JD?`)
+- Renders structured widgets inline — project cards, tech stack, skill graph,
+  architecture card — where a rich answer beats plain text
+
+See [docs/PRODUCT_VISION.md](./docs/PRODUCT_VISION.md) for the why and the design
+principles this holds itself to, and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for
+exactly how it's built.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech stack
 
 | Layer | Tech |
-|-------|------|
-| Frontend | Next.js 14, TailwindCSS, Framer Motion |
-| Backend | FastAPI, Python 3.11 |
-| Agents | LangGraph, Multi-agent orchestration |
-| Tools | MCP Protocol (5 servers) |
-| Vector DB | Qdrant |
-| Cache | Redis |
-| Database | PostgreSQL |
-| LLM | GPT-4 / Claude |
-| Deploy | Vercel + AWS ECS |
+|---|---|
+| Frontend | Next.js, TailwindCSS |
+| API gateway | FastAPI (thin SSE proxy, no local session state) |
+| Agent runtime | FastAPI + LangGraph — planner–executor graph, `Send`-based parallel fan-out |
+| LLM / embeddings | OpenAI (`gpt-4.1-mini` by default) — provider-swappable via env var |
+| Vector store | Qdrant |
+| Relational store | PostgreSQL — LangGraph conversation checkpoints + admin-edited profile data |
+| Cache | Redis — retrieval cache + full-response cache |
+| Deploy | Docker Compose on a single AWS EC2 box, Caddy for automatic HTTPS |
 
 ---
 
-## 🚀 Quick Start
+## Repository layout
+
+```
+├── frontend/           Next.js chat UI, landing page, admin panel
+├── services/
+│   ├── api/             FastAPI gateway (port 8000)
+│   ├── runtime/          LangGraph agent (port 8001, internal)
+│   └── ingestion/        RAG ingestion pipeline — CLI, run on demand
+├── shared/core/         Shared Python package — config, logging, exceptions
+├── infrastructure/docker/  Dockerfiles, prod Compose file, Caddyfile
+├── data/                RAG source documents (resume, projects, blogs, certificates)
+├── docker-compose.yml   Full local stack
+└── docs/                Architecture, product vision, local setup
+```
+
+---
+
+## Quick start
 
 ```bash
-git clone https://github.com/ravinder/ai-portfolio
-cd ai-portfolio
-docker-compose up -d
+git clone <this-repo>
+cd AI-Career-Platform
+docker compose up -d
 ```
 
-See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for full setup guide.
+See [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) for the full guide, including env vars
+and running services outside Docker for faster iteration.
 
 ---
 
-## 📁 Structure
+## Docs
 
-```
-├── frontend/        # Next.js 14 app
-├── backend/         # FastAPI + LangGraph
-├── knowledge-base/  # RAG source documents
-├── infrastructure/  # Docker + AWS
-└── docs/           # Architecture docs
-```
+- [docs/PRODUCT_VISION.md](./docs/PRODUCT_VISION.md) — what this is for, who it's for,
+  design principles, where it's headed
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — the system as actually built: graph
+  design, content model, caching, deployment topology, tradeoffs
+- [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) — running it locally
+- [docs/AGENT_PROMPT.md](./docs/AGENT_PROMPT.md) — design doc for the next planned
+  feature (clarifying questions), not yet implemented
 
 ---
 
-## 👤 About
+## About
 
-Built by **Varikuppala Ravinder** — Senior AI Platform Engineer
-specializing in RAG pipelines, LangGraph agents, and MCP tooling.
-
-- 🌐 [ravinder.dev](https://ravinder.dev)
-- 💼 [LinkedIn](https://www.linkedin.com/in/varikuppala-ravinder/)
-- 🐙 [GitHub](https://github.com/itravinder456)
+Built by **Varikuppala Ravinder**.

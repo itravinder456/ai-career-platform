@@ -78,7 +78,7 @@ services:
         condition: service_healthy
     # No healthcheck override — Dockerfile.runtime's own HEALTHCHECK (Python urllib)
     # already works; a curl-based override here can never succeed, since this image
-    # never installs curl. See docs/DEPLOYMENT.md's Troubleshooting section.
+    # never installs curl.
 
   # ── API gateway ────────────────────────────────────────────────────────────
   api:

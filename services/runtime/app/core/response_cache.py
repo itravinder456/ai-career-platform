@@ -1,5 +1,6 @@
 """
-Full-turn response cache — see docs/CACHING.md. Unlike app.tools.retrieval's cache
+Full-turn response cache — see docs/ARCHITECTURE.md's Caching section. Unlike
+app.tools.retrieval's cache
 (which only skips the Qdrant search), a hit here skips plan_tasks, every execute_task,
 and the final respond() LLM call entirely — the three separate model calls one chat turn
 costs. Keyed purely by the normalized question text, deliberately not scoped to session
