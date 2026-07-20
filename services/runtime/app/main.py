@@ -13,6 +13,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 
 from app.api.v1 import health, run
+from app.core.cache import close_cache
 from app.graphs.career import build_career_graph
 from app.memory import close_checkpointer, init_checkpointer
 from app.tools.retrieval import close_qdrant
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     await close_checkpointer()
     await close_qdrant()
     await close_embedder()
+    await close_cache()
     log.info("runtime.shutdown")
 
 

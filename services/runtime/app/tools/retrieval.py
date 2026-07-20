@@ -8,9 +8,12 @@ Qdrant/OpenAI hiccup doesn't crash the chat turn — same non-fatal-if-infra-dow
 services/api's lifespan checks.
 """
 
+import hashlib
+
 from langchain_core.tools import tool
 from qdrant_client import AsyncQdrantClient
 
+from app.core.cache import cache_get, cache_set
 from core.config import get_settings
 from core.embeddings import embed_query
 from core.logging.setup import get_logger
@@ -18,6 +21,7 @@ from core.logging.setup import get_logger
 log = get_logger(__name__)
 
 RESULT_LIMIT = 4
+CACHE_TTL_SECONDS = 24 * 60 * 60  # 24h — see docs/CACHING.md for why not permanent
 
 _qdrant: AsyncQdrantClient | None = None
 
@@ -38,10 +42,29 @@ async def close_qdrant() -> None:
         _qdrant = None
 
 
+def _cache_key(collection: str, query: str) -> str:
+    normalized = " ".join(query.lower().split())
+    digest = hashlib.sha256(normalized.encode()).hexdigest()[:32]
+    return f"rag:{collection}:{digest}"
+
+
 async def retrieve_context(query: str, limit: int = RESULT_LIMIT) -> str:
     """Core retrieval logic — called directly for mandatory context injection (career-
-    related graph nodes) and wrapped as a tool below for the LLM's own follow-up calls."""
+    related graph nodes) and wrapped as a tool below for the LLM's own follow-up calls.
+
+    Cached by normalized query text (see docs/CACHING.md) — RAG results for the same
+    question are deterministic and don't depend on conversation history, so this is safe
+    to cache aggressively. Only successful lookups are cached; a transient Qdrant/
+    embedding failure is never cached, so it can't get "stuck" serving a false
+    "unavailable" message after the underlying issue clears."""
     settings = get_settings()
+    cache_key = _cache_key(settings.qdrant_collection, query)
+
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        log.info("cache.hit", key=cache_key)
+        return cached
+    log.info("cache.miss", key=cache_key)
 
     try:
         embedding = await embed_query(query)
@@ -55,9 +78,12 @@ async def retrieve_context(query: str, limit: int = RESULT_LIMIT) -> str:
         return "The knowledge base is temporarily unavailable."
 
     if not response.points:
-        return "No relevant information found in the knowledge base."
+        result = "No relevant information found in the knowledge base."
+    else:
+        result = "\n\n".join(f"[{p.payload['source']}] {p.payload['text']}" for p in response.points)
 
-    return "\n\n".join(f"[{p.payload['source']}] {p.payload['text']}" for p in response.points)
+    await cache_set(cache_key, result, CACHE_TTL_SECONDS)
+    return result
 
 
 @tool

@@ -68,10 +68,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-portfolio}
       QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
       qdrant:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     # No healthcheck override — Dockerfile.runtime's own HEALTHCHECK (Python urllib)
     # already works; a curl-based override here can never succeed, since this image
