@@ -1,179 +1,104 @@
 """
-Career AI — LangGraph supervisor graph.
+Career AI — LangGraph planner-executor graph.
 
 Flow:
-  START → classify_intent → route → [project | skills | resume | jd_match | architecture | general]
-                                   → respond → END
+  START → plan_tasks → fan_out_tasks (Send × N) → execute_task (parallel)
+                                                  → respond → END
 
-Each specialised node enriches `state.context` with the right knowledge-base data
-(mandatory RAG retrieval — see below) then hands off to `respond`, which calls the
-LLM with the full context and returns the final answer.
+`plan_tasks` decomposes the user's message into 1-4 focused, self-contained sub-tasks
+(most messages produce exactly one — a compound recruiter question like "what have you
+built, what's your tech stack, and are you a fit for this JD" produces several).
+`fan_out_tasks` dynamically dispatches one `execute_task` invocation per task via
+LangGraph's `Send` — these run concurrently, each doing mandatory RAG retrieval plus an
+inline sufficiency-check-and-retry (app.executor.task_executor.run_task), and fan back in
+to a shared `results` list (AgentState.results, an Annotated[..., operator.add] reducer —
+same convention as `messages`/add_messages). `respond` waits for every branch, then makes
+the one LLM call that synthesizes everything into a single coherent answer and extracts
+any WIDGET blocks.
 
-No tool-calling is bound to this LLM call right now — retrieval already runs
-automatically per intent (app.tools.retrieval.retrieve_context), so the base LLM has
-no need to call tools itself, and Groq's streaming + bound-tools combination was
-throwing intermittent `tool call validation failed` errors mid-stream. Real agentic
-tool-calling (a planner routing to sub-agents/tools) is deliberately deferred to the
-upcoming multi-agent/planner-executor work rather than patched back in here.
+No tool-calling is bound to any of these LLM calls — retrieval already runs automatically
+per task (app.tools.retrieval.retrieve_context), so the base LLM has no need to call tools
+itself, and Groq's streaming + bound-tools combination was throwing intermittent `tool
+call validation failed` errors mid-stream. Real agentic tool-calling (sub-agents that
+decide their own actions) is deliberately deferred to a later phase rather than patched
+back in here — execute_task is a parameterized retrieval+verify step, not an agent, which
+is why this logic lives under app/executor/ and app/agents/ stays an empty stub.
 
 LLM provider selection lives in app.core.llm (graph-agnostic — reusable by any future
 graph); prompt templates and the WIDGET-parsing protocol live in app.prompts. This file
-holds only what's specific to *this* graph: intent taxonomy, context assembly, and topology.
+holds only what's specific to *this* graph: task planning, fan-out wiring, and respond.
 """
 
 import json
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Send
 
 from app.core.llm import build_llm
-from app.prompts.career import WIDGET_INSTRUCTION, build_base_system, parse_widget_block
-from app.state.agent_state import AgentState, Intent
+from app.executor.task_executor import run_task
+from app.prompts.career import (
+    PLAN_SYSTEM_PROMPT,
+    WIDGET_INSTRUCTION,
+    build_base_system,
+    parse_plan,
+    parse_widget_block,
+)
+from app.state.agent_state import AgentState, TaskExecutionInput
 from app.streaming import emit_step
-from app.tools.retrieval import retrieve_context
 from core.config import get_settings
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)
 
 
-# ── Node: classify intent ──────────────────────────────────────────────────────
+# ── Node: plan tasks ────────────────────────────────────────────────────────────
 
 
-def classify_intent(state: AgentState) -> dict:
-    emit_step("classify")
-    user_input = state["user_input"].lower()
+async def plan_tasks(state: AgentState) -> dict:
+    emit_step("plan")
+    llm = build_llm(get_settings())
 
-    if any(
-        k in user_input
-        for k in ("project", "built", "work on", "portfolio", "system", "platform")
-    ):
-        intent: Intent = "project"
-    elif any(
-        k in user_input
-        for k in ("skill", "know", "tech", "stack", "language", "framework", "tool")
-    ):
-        intent = "skills"
-    elif any(
-        k in user_input
-        for k in ("resume", "cv", "experience", "background", "work history")
-    ):
-        intent = "resume"
-    elif any(
-        k in user_input
-        for k in (
-            "job",
-            "jd",
-            "description",
-            "match",
-            "fit",
-            "role",
-            "position",
-            "hiring",
-        )
-    ):
-        intent = "jd_match"
-    elif any(
-        k in user_input
-        for k in (
-            "architecture",
-            "design",
-            "diagram",
-            "flow",
-            "how does",
-            "how it works",
-        )
-    ):
-        intent = "architecture"
-    else:
-        intent = "general"
+    ai_message = await llm.ainvoke(
+        [
+            SystemMessage(content=PLAN_SYSTEM_PROMPT),
+            HumanMessage(content=state["user_input"]),
+        ]
+    )
+    tasks = parse_plan(str(ai_message.content), fallback_query=state["user_input"])
+    if not tasks:
+        # Structurally impossible per parse_plan's own fail-open contract, but an empty
+        # tasks list means fan_out_tasks dispatches nothing and respond() never runs —
+        # the turn would silently produce no answer with no error surfaced. Guard here
+        # too rather than trust that invariant to hold from one call site alone.
+        tasks = [{"intent": "general", "query": state["user_input"]}]
 
-    log.info("intent.classified", intent=intent, input_preview=user_input[:80])
-    return {"intent": intent}
+    log.info("tasks.planned", count=len(tasks), input_preview=state["user_input"][:80])
+    return {"tasks": tasks}
 
 
-# ── Node: context loaders (one per intent) ────────────────────────────────────
-#
-# All six run mandatory retrieval against Qdrant using the user's own question as the
-# query — career facts come from RAG only (see app.knowledge.profile and
-# app.prompts.career), never from hardcoded data. This is deliberately universal, not
-# gated by intent: classify_intent is a keyword match and *will* miss real career
-# questions phrased unexpectedly (e.g. "tell me about yourself" matches no keyword and
-# used to fall to "general", which skipped retrieval — with zero grounding, the model
-# would sometimes fabricate a plausible-sounding bio instead of admitting it had no
-# data). Retrieving unconditionally means there's always real context to answer from
-# or to honestly say "not covered", never a genuinely empty-handed model.
+# ── Fan-out: one execute_task invocation per planned task, run concurrently ───
 
 
-async def load_project_context(state: AgentState) -> dict:
-    emit_step("retrieve")
-    return {
-        "context": {
-            "retrieved": await retrieve_context(state["user_input"]),
-            "hint": "Describe projects in detail with tech, impact, and architecture. Offer the "
-            "project_card widget.",
-        }
-    }
+def fan_out_tasks(state: AgentState) -> list[Send]:
+    return [Send("execute_task", {"task": task}) for task in state["tasks"]]
 
 
-async def load_skills_context(state: AgentState) -> dict:
-    emit_step("retrieve")
-    return {
-        "context": {
-            "retrieved": await retrieve_context(state["user_input"]),
-            "hint": "List skills grouped sensibly. Offer the tech_stack widget.",
-        }
-    }
+# ── Node: execute one task (thin wrapper — logic lives in app.executor) ───────
 
 
-async def load_resume_context(state: AgentState) -> dict:
-    emit_step("retrieve")
-    return {
-        "context": {
-            "retrieved": await retrieve_context(state["user_input"]),
-            "hint": "Summarise experience concisely. Offer the resume_preview widget.",
-        }
-    }
+async def execute_task(state: TaskExecutionInput) -> dict:
+    result = await run_task(state["task"])
+    return {"results": [result]}
 
 
-async def load_jd_context(state: AgentState) -> dict:
-    emit_step("retrieve")
-    return {
-        "context": {
-            "retrieved": await retrieve_context(state["user_input"]),
-            "hint": "Analyse the JD against Ravinder's skills and experience. Score the match out "
-            "of 10. Be specific about gaps.",
-        }
-    }
-
-
-async def load_architecture_context(state: AgentState) -> dict:
-    emit_step("retrieve")
-    return {
-        "context": {
-            "retrieved": await retrieve_context(state["user_input"]),
-            "hint": "Describe architecture layers, components, and data flow. Offer the "
-            "architecture widget.",
-        }
-    }
-
-
-async def load_general_context(state: AgentState) -> dict:
-    emit_step("retrieve")
-    return {
-        "context": {
-            "retrieved": await retrieve_context(state["user_input"]),
-            "hint": "Be conversational and helpful. If the retrieved content doesn't cover this, "
-            "say so honestly rather than guessing.",
-        }
-    }
-
-
-# ── Node: respond (calls the LLM, extracts widgets) ──────────────────────────
+# ── Node: respond (calls the LLM, extracts widgets) ───────────────────────────
 #
 # state["messages"] already holds the full conversation (checkpointer loads
 # prior turns; the caller appends only the new HumanMessage before invoking).
+# Kept as this exact node name — app/api/v1/run.py's SSE streaming filter matches
+# on meta["langgraph_node"] == "respond" to decide which LLM's tokens are user-facing.
 
 
 async def respond(state: AgentState) -> dict:
@@ -181,8 +106,8 @@ async def respond(state: AgentState) -> dict:
     llm = build_llm(get_settings())
 
     context_block = ""
-    if state.get("context"):
-        context_block = f"\n\n--- CONTEXT ---\n{json.dumps(state['context'], indent=2)}"
+    if state.get("results"):
+        context_block = f"\n\n--- CONTEXT ---\n{json.dumps(state['results'], indent=2)}"
 
     base_system = await build_base_system()
     system = base_system + context_block + "\n\n" + WIDGET_INSTRUCTION
@@ -194,49 +119,19 @@ async def respond(state: AgentState) -> dict:
     return {"messages": [ai_message], "response": response_text, "widgets": widgets}
 
 
-# ── Routing function ───────────────────────────────────────────────────────────
-
-
-def route_by_intent(state: AgentState) -> str:
-    return state["intent"]
-
-
 # ── Build the graph ────────────────────────────────────────────────────────────
 
 
 def build_career_graph(checkpointer: BaseCheckpointSaver) -> StateGraph:
     builder = StateGraph(AgentState)
 
-    # Nodes
-    builder.add_node("classify_intent", classify_intent)
-    builder.add_node("project", load_project_context)
-    builder.add_node("skills", load_skills_context)
-    builder.add_node("resume", load_resume_context)
-    builder.add_node("jd_match", load_jd_context)
-    builder.add_node("architecture", load_architecture_context)
-    builder.add_node("general", load_general_context)
+    builder.add_node("plan_tasks", plan_tasks)
+    builder.add_node("execute_task", execute_task)
     builder.add_node("respond", respond)
 
-    # Entry
-    builder.add_edge(START, "classify_intent")
-
-    # Conditional routing by intent
-    builder.add_conditional_edges(
-        "classify_intent",
-        route_by_intent,
-        {
-            "project": "project",
-            "skills": "skills",
-            "resume": "resume",
-            "jd_match": "jd_match",
-            "architecture": "architecture",
-            "general": "general",
-        },
-    )
-
-    # All context nodes flow into respond, which is the final step
-    for node in ("project", "skills", "resume", "jd_match", "architecture", "general"):
-        builder.add_edge(node, "respond")
+    builder.add_edge(START, "plan_tasks")
+    builder.add_conditional_edges("plan_tasks", fan_out_tasks, ["execute_task"])
+    builder.add_edge("execute_task", "respond")
     builder.add_edge("respond", END)
 
     return builder.compile(checkpointer=checkpointer)

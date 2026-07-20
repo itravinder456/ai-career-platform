@@ -19,8 +19,9 @@ WIDGET_MARKER = "WIDGET:"
 
 # Placeholder step labels — machine `id`s stay stable; reword these freely later.
 STEP_LABELS: dict[str, str] = {
-    "classify": "Understanding your question",
+    "plan": "Understanding your question",
     "retrieve": "Searching knowledge base",
+    "verify": "Checking retrieved context",
     "respond": "Composing answer",
     "tool": "Looking up details",
 }
@@ -96,12 +97,12 @@ class TokenWidgetSplitter:
         self._pending = self._pending[-hold:]
         return emit
 
-    def finish(self) -> tuple[str, dict | None]:
-        """Returns (trailing_text_to_emit, widget_or_none)."""
+    def finish(self) -> tuple[str, list[dict]]:
+        """Returns (trailing_text_to_emit, widgets) — zero or more widgets."""
         if self._in_widget:
             _, widgets = parse_widget_block(WIDGET_MARKER + self._widget_raw)
-            return "", (widgets[0] if widgets else None)
+            return "", widgets
 
         trailing = self._pending
         self._pending = ""
-        return trailing, None
+        return trailing, []

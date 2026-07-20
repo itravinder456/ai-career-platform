@@ -1,9 +1,9 @@
 """
 LLM provider factory — graph-agnostic. Any graph binds its own tools; this module
-only knows how to construct the right chat model for LLM_PROVIDER=groq|anthropic|ollama.
+only knows how to construct the right chat model for
+LLM_PROVIDER=openai|groq|anthropic|ollama. Defaults to openai when unset/unrecognised.
 """
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
@@ -31,13 +31,26 @@ def build_llm(settings: AppSettings, tools: list[BaseTool] | None = None) -> Bas
             base_url=settings.ollama_base_url,
             temperature=settings.llm_temperature,
         )
-    else:
-        # Default: anthropic
+    elif provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
         if not settings.anthropic_api_key:
             raise ValueError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic")
         llm = ChatAnthropic(
             model=settings.anthropic_model,
             api_key=settings.anthropic_api_key.get_secret_value(),
+            max_tokens=settings.llm_max_tokens,
+            temperature=settings.llm_temperature,
+        )
+    else:
+        # Default: openai
+        from langchain_openai import ChatOpenAI
+
+        if not settings.openai_api_key:
+            raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
+        llm = ChatOpenAI(
+            model=settings.openai_model,
+            api_key=settings.openai_api_key.get_secret_value(),
             max_tokens=settings.llm_max_tokens,
             temperature=settings.llm_temperature,
         )

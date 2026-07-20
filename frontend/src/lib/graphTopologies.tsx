@@ -25,35 +25,36 @@ export const TOPOLOGIES: Topology[] = [
     ),
     caption: (
       <>
-        This is the actual LangGraph topology behind the chat — a classifier routes each question
-        to a retrieval node, grounded in the real resume, before it reaches <b>respond</b>.
+        This is the actual LangGraph topology behind the chat — a planner breaks compound
+        questions into focused sub-tasks that run <b>concurrently</b>, grounded in the real
+        resume, before <b>respond</b> synthesizes them into one answer.
       </>
     ),
     nodes: [
       { id: "start", label: "start", x: 0.08, y: 0.5, r: 5 },
-      { id: "classify", label: "classify_intent", x: 0.34, y: 0.5, r: 7 },
-      { id: "project", label: "project", x: 0.64, y: 0.12, r: 6 },
-      { id: "skills", label: "skills", x: 0.64, y: 0.37, r: 6 },
-      { id: "resume", label: "resume", x: 0.64, y: 0.62, r: 6 },
-      { id: "jd_match", label: "jd_match", x: 0.64, y: 0.87, r: 6 },
+      { id: "plan", label: "plan_tasks", x: 0.34, y: 0.5, r: 7 },
+      { id: "project", label: "execute_task", x: 0.64, y: 0.12, r: 6 },
+      { id: "skills", label: "execute_task", x: 0.64, y: 0.37, r: 6 },
+      { id: "resume", label: "execute_task", x: 0.64, y: 0.62, r: 6 },
+      { id: "jd_match", label: "execute_task", x: 0.64, y: 0.87, r: 6 },
       { id: "respond", label: "respond", x: 0.92, y: 0.5, r: 7 },
     ],
     edges: [
-      ["start", "classify"],
-      ["classify", "project"],
-      ["classify", "skills"],
-      ["classify", "resume"],
-      ["classify", "jd_match"],
+      ["start", "plan"],
+      ["plan", "project"],
+      ["plan", "skills"],
+      ["plan", "resume"],
+      ["plan", "jd_match"],
       ["project", "respond"],
       ["skills", "respond"],
       ["resume", "respond"],
       ["jd_match", "respond"],
     ],
     paths: [
-      ["start", "classify", "project", "respond"],
-      ["start", "classify", "skills", "respond"],
-      ["start", "classify", "resume", "respond"],
-      ["start", "classify", "jd_match", "respond"],
+      ["start", "plan", "project", "respond"],
+      ["start", "plan", "skills", "respond"],
+      ["start", "plan", "resume", "respond"],
+      ["start", "plan", "jd_match", "respond"],
     ],
   },
 

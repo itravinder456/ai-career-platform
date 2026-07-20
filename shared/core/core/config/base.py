@@ -15,6 +15,7 @@ from core.config.constants import (
     DEFAULT_CORS_ORIGINS,
     DEFAULT_ENVIRONMENT,
     DEFAULT_HOST,
+    DEFAULT_LLM_PROVIDER,
     DEFAULT_LOG_LEVEL,
     DEFAULT_PORT,
     DEFAULT_QDRANT_COLLECTION,
@@ -25,6 +26,7 @@ from core.config.constants import (
     JWT_ALGORITHM,
     JWT_EXPIRY_MINUTES,
     LANGSMITH_DEFAULT_PROJECT,
+    OPENAI_DEFAULT_MODEL,
     REDIS_MAX_CONNECTIONS,
     SESSION_TTL_SECONDS,
 )
@@ -78,7 +80,9 @@ class AppSettings(BaseSettings):
     jwt_expiry_minutes: int = Field(default=JWT_EXPIRY_MINUTES, alias="JWT_EXPIRY_MINUTES")
 
     # ── LLM (runtime) ──────────────────────────────────────────────────────
-    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
+    llm_provider: str = Field(default=DEFAULT_LLM_PROVIDER, alias="LLM_PROVIDER")
+    openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str = Field(default=OPENAI_DEFAULT_MODEL, alias="OPENAI_MODEL")
     anthropic_api_key: SecretStr | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     anthropic_model: str = Field(default=ANTHROPIC_DEFAULT_MODEL, alias="ANTHROPIC_MODEL")
     anthropic_max_tokens: int = Field(default=ANTHROPIC_MAX_TOKENS, alias="ANTHROPIC_MAX_TOKENS")
@@ -92,7 +96,6 @@ class AppSettings(BaseSettings):
     embedding_provider: str = Field(default=EMBEDDING_DEFAULT_PROVIDER, alias="EMBEDDING_PROVIDER")
     embedding_model: str = Field(default=EMBEDDING_DEFAULT_MODEL, alias="EMBEDDING_MODEL")
     embedding_vector_size: int = Field(default=EMBEDDING_VECTOR_SIZE, alias="EMBEDDING_VECTOR_SIZE")
-    openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
 
     # ── Observability (api, runtime) ───────────────────────────────────────
     langsmith_api_key: SecretStr | None = Field(default=None, alias="LANGSMITH_API_KEY")

@@ -2,7 +2,7 @@
 POST   /api/v1/run             — internal endpoint called by services/api.
                                   Streams the LangGraph career graph for one turn over SSE:
                                   step events (progress), token events (incremental answer),
-                                  an optional widget event, then done. History is loaded/saved
+                                  zero or more widget events, then done. History is loaded/saved
                                   automatically by the checkpointer, keyed by session_id.
 DELETE /api/v1/run/{session_id} — clears that conversation's checkpoint state.
 """
@@ -77,8 +77,8 @@ async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, Non
         "messages": [HumanMessage(content=body.message)],
         "session_id": body.session_id,
         "user_input": body.message,
-        "intent": "general",
-        "context": {},
+        "tasks": [],
+        "results": [],
         "response": "",
         "widgets": [],
     }
@@ -101,10 +101,10 @@ async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, Non
                 if emit:
                     yield _sse({"type": "token", "content": emit})
 
-        trailing, widget = splitter.finish()
+        trailing, widgets = splitter.finish()
         if trailing:
             yield _sse({"type": "token", "content": trailing})
-        if widget:
+        for widget in widgets:
             yield _sse(widget)
 
         yield _sse({"type": "done"})

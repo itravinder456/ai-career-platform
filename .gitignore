@@ -2,8 +2,10 @@
 .env
 .env.local
 .env.*.local
+.env.prod
 services/**/.env
 services/**/.env.local
+services/**/.env.prod
 
 # ── Python ─────────────────────────────────────────────────────────────────────
 __pycache__/

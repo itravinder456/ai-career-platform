@@ -7,55 +7,102 @@ interface Category {
   items: string[];
 }
 
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+const item = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE } },
+};
+
 export default function TechStack({ categories }: { categories: Category[] }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -1 }}
-      className="mt-3 rounded-xl p-4 grid grid-cols-2 gap-4"
-      style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid var(--border)",
-        backdropFilter: "blur(8px)",
-      }}
+      transition={{ duration: 0.45, ease: EASE }}
+      style={{ marginTop: 10, borderRadius: 14, padding: 1 }}
     >
-      {categories.map((cat, ci) => (
+      {/* Gradient border wrapper */}
+      <div
+        style={{
+          borderRadius: 14,
+          padding: 1,
+          background: "linear-gradient(135deg, rgba(107,138,148,0.3) 0%, rgba(143,176,186,0.12) 50%, rgba(52,74,82,0.2) 100%)",
+        }}
+      >
         <motion.div
-          key={cat.label}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: ci * 0.08, duration: 0.35 }}
+          whileHover={{ y: -1 }}
+          style={{
+            position: "relative",
+            borderRadius: 13,
+            padding: "18px 20px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 16,
+            background: "linear-gradient(160deg, rgba(107,138,148,0.07) 0%, rgba(16,15,12,0.95) 60%)",
+            backdropFilter: "blur(16px)",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+            cursor: "default",
+            overflow: "hidden",
+          }}
         >
-          <p
-            className="mb-2 text-xs font-semibold uppercase tracking-widest"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {cat.label}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {cat.items.map((item, i) => (
-              <motion.span
-                key={item}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: ci * 0.08 + i * 0.04 + 0.1 }}
-                whileHover={{ scale: 1.05, borderColor: "rgba(107,138,148,0.5)" }}
-                className="rounded-md px-2 py-0.5 text-xs font-medium cursor-default"
-                style={{
-                  background: "rgba(107,138,148,0.09)",
-                  color: "var(--wire-bright)",
-                  border: "1px solid rgba(107,138,148,0.2)",
-                  transition: "border-color 0.2s ease",
-                }}
-              >
-                {item}
-              </motion.span>
+          {/* Accent top stripe */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2,
+              borderRadius: "13px 13px 0 0",
+              background: "linear-gradient(90deg, rgba(107,138,148,0.6), rgba(143,176,186,0.3), transparent)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <motion.div variants={container} initial="hidden" animate="show" style={{ display: "contents" }}>
+            {categories.map((cat) => (
+              <motion.div key={cat.label} variants={item}>
+                <p
+                  style={{
+                    marginBottom: 8,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {cat.label}
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {cat.items.map((skillItem) => (
+                    <span
+                      key={skillItem}
+                      style={{
+                        borderRadius: 6,
+                        padding: "3px 9px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: "rgba(107,138,148,0.1)",
+                        color: "var(--wire-bright)",
+                        border: "1px solid rgba(107,138,148,0.2)",
+                        letterSpacing: "0.01em",
+                      }}
+                    >
+                      {skillItem}
+                    </span>
+                  ))}
+                </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </motion.div>
-      ))}
+      </div>
     </motion.div>
   );
 }

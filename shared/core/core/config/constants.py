@@ -9,6 +9,8 @@ DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 
 # ── LLM — model behaviour (not keys) ─────────────────────────────────────────
+DEFAULT_LLM_PROVIDER = "openai"
+OPENAI_DEFAULT_MODEL = "gpt-4.1-mini"
 ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-5"
 ANTHROPIC_MAX_TOKENS = 8096
 ANTHROPIC_TEMPERATURE = 0.7

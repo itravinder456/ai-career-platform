@@ -38,10 +38,21 @@ interface Props {
 
 export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   const [greetingId] = useState(generateId);
+  // Captured once at mount (lazy initializer, never recomputed): arriving with a
+  // question already queued (a landing-page prompt click) means the user's real intent
+  // is that question, not watching the canned greeting type itself out first — skip
+  // the typing animation entirely and seed the greeting already complete in that case.
+  const [skipGreetingAnimation] = useState(() => !!askSignal?.q?.trim());
   const [messages, setMessages] = useState<Message[]>(() => [
-    { id: greetingId, role: "assistant", content: "", isStreaming: true, timestamp: new Date() },
+    {
+      id: greetingId,
+      role: "assistant",
+      content: skipGreetingAnimation ? GREETING_TEXT : "",
+      isStreaming: !skipGreetingAnimation,
+      timestamp: new Date(),
+    },
   ]);
-  const [isStreaming, setIsStreaming] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(!skipGreetingAnimation);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
 
@@ -63,7 +74,11 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   }, [isStreaming, onBusyChange]);
 
   // Greeting typing animation — only the timer lives here; the message already exists.
+  // No-ops when skipGreetingAnimation is true: the initial state above already seeded
+  // the greeting complete and isStreaming=false, so there's nothing left to animate.
   useEffect(() => {
+    if (skipGreetingAnimation) return;
+
     let cancelled = false;
     let accumulated = "";
     const words = GREETING_TEXT.split(" ");
@@ -91,7 +106,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [greetingId]);
+  }, [greetingId, skipGreetingAnimation]);
 
   // Scrolls only scrollRef itself (never bubbles a scroll request up to ancestors the
   // way `element.scrollIntoView()` can — that walked up to the fixed app root, which

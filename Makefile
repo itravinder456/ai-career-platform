@@ -1,9 +1,11 @@
 .PHONY: help install dev build up down restart logs clean \
         api-shell runtime-shell db-shell redis-shell \
-        migrate test lint format sync-core ingest
+        migrate test lint format sync-core ingest \
+        prod-build prod-up prod-down prod-restart prod-logs prod-ps
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 DOCKER_COMPOSE := docker compose
+DOCKER_COMPOSE_PROD := docker compose -f infrastructure/docker/docker-compose.prod.yml
 UV := uv
 
 # ── Help ───────────────────────────────────────────────────────────────────────
@@ -27,6 +29,14 @@ help:
 	@echo "    make logs-api        Tail api logs"
 	@echo "    make logs-runtime    Tail runtime logs"
 	@echo "    make logs-frontend   Tail frontend logs"
+	@echo ""
+	@echo "  Production (see docs/DEPLOYMENT.md)"
+	@echo "    make prod-build      Build production images (infrastructure/docker/docker-compose.prod.yml)"
+	@echo "    make prod-up         Start the production stack (detached)"
+	@echo "    make prod-down       Stop and remove production containers"
+	@echo "    make prod-restart    prod-down + prod-up"
+	@echo "    make prod-logs       Tail production logs"
+	@echo "    make prod-ps         Show production container status/health"
 	@echo ""
 	@echo "  Database"
 	@echo "    make migrate         Run Alembic migrations (TODO)"
@@ -106,6 +116,27 @@ logs-runtime:
 
 logs-frontend:
 	$(DOCKER_COMPOSE) logs -f frontend
+
+# ── Production (see docs/DEPLOYMENT.md) ─────────────────────────────────────────
+# Run these ON the deployed box, from the repo root — requires services/{api,runtime}
+# /.env.prod to already exist (copy from the .env.prod.example next to each) and
+# PUBLIC_API_URL set in the shell environment (e.g. export PUBLIC_API_URL=https://your-domain.example.com).
+prod-build:
+	$(DOCKER_COMPOSE_PROD) build
+
+prod-up:
+	$(DOCKER_COMPOSE_PROD) up -d --build
+
+prod-down:
+	$(DOCKER_COMPOSE_PROD) down
+
+prod-restart: prod-down prod-up
+
+prod-logs:
+	$(DOCKER_COMPOSE_PROD) logs -f
+
+prod-ps:
+	$(DOCKER_COMPOSE_PROD) ps
 
 # ── Shells ─────────────────────────────────────────────────────────────────────
 api-shell:

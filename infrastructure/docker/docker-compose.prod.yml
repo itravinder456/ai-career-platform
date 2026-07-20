@@ -1,0 +1,100 @@
+name: ai-career-platform
+
+# Production topology for a single free-tier EC2 box: Postgres and Qdrant are NOT
+# containers here — Postgres is AWS RDS, Qdrant is Qdrant Cloud (both external, see
+# services/{api,runtime}/.env.prod). This file only runs what actually needs to live on
+# the box: redis (session cache — AWS ElastiCache isn't reliably free-tier), the three
+# app services, and Caddy for TLS termination + reverse proxy.
+#
+# Build context is the repo root, same as docker-compose.yml, so this must be run from
+# there: `docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build`
+
+services:
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Runtime (LangGraph agents) ─────────────────────────────────────────────
+  runtime:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.runtime
+    restart: unless-stopped
+    env_file:
+      - ../../services/runtime/.env.prod
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  # ── API gateway ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    restart: unless-stopped
+    env_file:
+      - ../../services/api/.env.prod
+    environment:
+      REDIS_URL: redis://redis:6379
+      RUNTIME_URL: http://runtime:8001
+    depends_on:
+      redis:
+        condition: service_healthy
+      runtime:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.frontend
+    restart: unless-stopped
+    environment:
+      # Browser calls this directly (not over the Docker network) — set to the real
+      # public domain, e.g. https://ai.yourdomain.com, before deploying.
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in the shell env or an .env next to this file}
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── Reverse proxy + automatic TLS ─────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+      api:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:

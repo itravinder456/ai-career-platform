@@ -5,8 +5,21 @@ import { AppState } from "@/types/chat";
 import { useProfile } from "@/hooks/useProfile";
 import { SocialIcon } from "@/components/ui/SocialIcons";
 
-export default function Navbar({ state }: { state: AppState }) {
+export default function Navbar({
+  state,
+  onGoHome,
+  scrolled = false,
+}: {
+  state: AppState;
+  onGoHome?: () => void;
+  // Hero scrolls internally (its own overflow-y-auto), independent of this fixed
+  // header — on landing the header is deliberately transparent at rest, but once
+  // Hero's content scrolls even slightly it slides up underneath and visually
+  // collides with the logo/links. Solidify the header the moment that happens.
+  scrolled?: boolean;
+}) {
   const inChat = state === "chat";
+  const solid = inChat || scrolled;
   const { links } = useProfile();
 
   return (
@@ -20,11 +33,11 @@ export default function Navbar({ state }: { state: AppState }) {
         height: 56,
         display: "flex",
         alignItems: "center",
-        background: inChat ? "rgba(6,6,16,0.85)" : "transparent",
-        borderBottom: `1px solid ${inChat ? "rgba(255,255,255,0.08)" : "transparent"}`,
-        backdropFilter: inChat ? "blur(20px) saturate(1.5)" : "none",
-        WebkitBackdropFilter: inChat ? "blur(20px) saturate(1.5)" : "none",
-        transition: "background 0.4s ease, border-color 0.4s ease",
+        background: solid ? "rgba(16,15,12,0.82)" : "transparent",
+        borderBottom: `1px solid ${solid ? "var(--hero-line-bright)" : "transparent"}`,
+        backdropFilter: solid ? "blur(20px) saturate(1.5)" : "none",
+        WebkitBackdropFilter: solid ? "blur(20px) saturate(1.5)" : "none",
+        transition: "background 0.3s ease, border-color 0.3s ease",
       }}
     >
       <div
@@ -38,9 +51,18 @@ export default function Navbar({ state }: { state: AppState }) {
           justifyContent: "space-between",
         }}
       >
-        {/* Logo — rendered as one string to avoid any gap */}
+        {/* Logo — rendered as one string to avoid any gap. In chat, this is an
+            in-app "go home" action (setState, cross-fades via AnimatePresence in
+            page.tsx) rather than a real navigation — a full href="/" reload would
+            hard-cut straight past that transition. */}
         <motion.a
           href="/"
+          onClick={(e) => {
+            if (inChat && onGoHome) {
+              e.preventDefault();
+              onGoHome();
+            }
+          }}
           whileHover={{ opacity: 0.8 }}
           transition={{ duration: 0.15 }}
           style={{ textDecoration: "none", userSelect: "none", lineHeight: 1 }}

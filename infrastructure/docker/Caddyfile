@@ -1,0 +1,11 @@
+# Replace with your real domain before deploying — Caddy needs a DNS name pointed at
+# this box's Elastic IP to issue a Let's Encrypt cert; it can't get one for a bare IP.
+your-domain.example.com {
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

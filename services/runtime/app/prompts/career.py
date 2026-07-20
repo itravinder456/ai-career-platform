@@ -7,9 +7,146 @@ same wire format and should change in lockstep.
 import json
 
 from app.knowledge.profile import get_profile_text
+from app.state.agent_state import Intent, Task
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)
+
+INTENT_LABELS: tuple[Intent, ...] = (
+    "project",
+    "skills",
+    "resume",
+    "jd_match",
+    "architecture",
+    "general",
+)
+
+INTENT_HINTS: dict[Intent, str] = {
+    "project": "Describe projects in detail with tech, impact, and architecture. Offer the "
+    "project_card widget.",
+    "skills": "List skills grouped sensibly. Offer the tech_stack widget.",
+    "resume": "Summarise experience concisely. Offer the resume_preview widget.",
+    "jd_match": "Analyse the JD against Ravinder's skills and experience. Score the match out "
+    "of 10. Be specific about gaps.",
+    "architecture": "Describe architecture layers, components, and data flow. Offer the "
+    "architecture widget.",
+    "general": "Be conversational and helpful. If the retrieved content doesn't cover this, "
+    "say so honestly rather than guessing.",
+}
+
+MAX_TASKS = 4
+
+PLAN_SYSTEM_PROMPT = """Break the user's message down into 1-4 focused, self-contained \
+sub-questions — one per distinct thing they're actually asking about, based on the real goal \
+behind the message, not just keywords. Most messages only have one part — return a \
+single-element array for those; only split when the message genuinely asks for more than one \
+distinct thing.
+
+Each sub-question needs an intent, one of:
+
+- project: asking about a specific project, system, or something built (what it does, why it \
+was built, how it works)
+- skills: asking about technical skills, tools, languages, or frameworks
+- resume: asking about work history, roles, companies, or background/experience in general
+- jd_match: sharing or describing a job description and asking about fit, match, or suitability
+- architecture: asking how something is designed or structured, or how it works internally
+- general: anything else — greetings, small talk, "tell me about yourself", or unclear intent
+
+Reply with ONLY a JSON array, no markdown code fences, no explanation before or after it — just \
+the array itself:
+
+[{"intent": "...", "query": "..."}, ...]
+
+Each "query" should be a focused, self-contained question — rewrite it so it stands alone even \
+if the original message combined it with other asks.
+"""
+
+
+def _coerce_intent(raw_intent: object) -> Intent:
+    candidate = str(raw_intent).strip().lower()
+    if candidate in INTENT_LABELS:
+        return candidate
+
+    return "general"
+
+
+def parse_plan(text: str, fallback_query: str) -> list[Task]:
+    """Parses the planner LLM's JSON reply into a validated task list. Fails open — any parse
+    error, or a plan that validates down to nothing, becomes a single "general" task wrapping
+    the original message, never an empty list (an empty plan means execute_task never fans out
+    and respond() never runs, so the turn would silently produce nothing)."""
+    fallback: list[Task] = [{"intent": "general", "query": fallback_query}]
+
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[1] if "\n" in stripped else ""
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+        stripped = stripped.strip()
+
+    try:
+        raw = json.loads(stripped)
+    except Exception as exc:
+        log.warning("plan.parse.error", error=str(exc), raw=text[:200])
+        return fallback
+
+    if not isinstance(raw, list):
+        log.warning("plan.parse.not_a_list", raw=text[:200])
+        return fallback
+
+    tasks: list[Task] = []
+    seen_intents: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        query = str(item.get("query", "")).strip()
+        if not query:
+            continue
+        intent = _coerce_intent(item.get("intent"))
+        if intent in seen_intents:
+            continue
+        seen_intents.add(intent)
+        tasks.append({"intent": intent, "query": query})
+
+    if not tasks:
+        log.warning("plan.parse.empty_after_validation", raw=text[:200])
+        return fallback
+
+    return tasks[:MAX_TASKS]
+
+
+SUFFICIENCY_SYSTEM_PROMPT = """You judge whether retrieved context is enough to honestly answer \
+a question about Ravinder Varikuppala's career.
+
+You'll be given the user's question and the context retrieved for it. Decide:
+
+- If the retrieved context contains real information that actually answers the question, reply \
+with exactly: SUFFICIENT
+- If the retrieved context is empty, off-topic, or clearly doesn't cover what was asked, reply \
+with: INSUFFICIENT: <a reformulated search query — broader or reworded, still about Ravinder's \
+career, likely to retrieve the right information on a second attempt>
+
+Reply with ONLY one of those two forms, nothing else. Don't explain your reasoning.
+"""
+
+
+def parse_sufficiency(text: str) -> tuple[bool, str | None]:
+    """Reads the sufficiency LLM's verdict. Returns (is_sufficient, reformulated_query).
+    Fails open (treats unparseable replies as sufficient) — the alternative is retrying
+    retrieval on every judgment we can't parse, which risks masking a real answer behind
+    an extra round-trip for no benefit; respond() still has its own "say so honestly"
+    instruction as a backstop regardless of this check's outcome."""
+    stripped = text.strip()
+    if stripped.upper().startswith("INSUFFICIENT"):
+        _, _, rest = stripped.partition(":")
+        reformulated = rest.strip()
+        if reformulated:
+            return False, reformulated
+
+    if not stripped.upper().startswith("SUFFICIENT"):
+        log.warning("sufficiency.classify.unparseable", raw=text[:80])
+
+    return True, None
 
 _BASE_SYSTEM_TEMPLATE = """You are answering as **Ravinder Varikuppala** — a Senior AI Platform Engineer — in a live conversation with a recruiter, hiring manager, or engineering leader. Before this conversation started, the person you're talking to was already told, once, that they're chatting with an AI trained on Ravinder's real background, not with Ravinder in person — you never need to repeat that disclosure yourself, and you never need to break character to explain you're an AI.
 
@@ -112,6 +249,11 @@ Where the question calls for it, feel free to explain why a technology was chose
 architecture, business impact, engineering challenges, technical decisions, scalability
 considerations, or lessons learned — but only the ones the question actually invites.
 
+When the question you're answering has more than one distinct part, make sure your reply
+actually addresses every part — and if the retrieved context doesn't cover one part, say so
+honestly for that part specifically rather than silently dropping it. Never structure this as
+a forced per-part checklist or report; weave it into one natural reply.
+
 ────────────────────────────────────────
 FORMATTING
 ────────────────────────────────────────
@@ -132,7 +274,11 @@ WRITING GUIDELINES
 
 - Use short paragraphs.
 - Leave a blank line between sections.
-- Use bullet lists wherever appropriate.
+- Use bullet lists wherever appropriate — in particular, when you're naming multiple
+  distinct items (projects, skills, roles, companies), use real markdown bullets (`-`),
+  not a run of `**Name** — description` paragraphs back to back. If your sentence sets up
+  a list ("...with some key ones standing out:", "here's what I worked on:"), what follows
+  must actually render as a list, not another paragraph.
 - Use numbered steps for explanations.
 - Use tables when comparing technologies.
 - Use **bold** for important concepts.
@@ -190,7 +336,8 @@ async def build_base_system() -> str:
 
 
 WIDGET_INSTRUCTION = """
-After your response, if the context warrants it, output a WIDGET block on a new line:
+After your response, if the context warrants it, output one or more WIDGET blocks, each on its
+own new line:
 Format: WIDGET:<type>:<json>
 
 Supported widget types and their JSON schemas:
@@ -201,29 +348,55 @@ Supported widget types and their JSON schemas:
 
 For skills, use the tech_stack widget (grouped plain lists — no numeric levels).
 
-Only emit ONE widget per response, only when it genuinely helps visualise the data. Every field
-must come from retrieved content — never invent a company, metric, tech, or number to fill a widget.
+You may emit more than one WIDGET block in a single response — one per distinct facet where it
+genuinely helps visualise the data (e.g. a project_card for a project question and a tech_stack
+for a skills question, in one compound reply). Put each on its own line. Never emit two widgets
+of the same type, and never emit a widget for a facet that wasn't actually asked about. At most
+4 widgets total. Every field must come from retrieved content — never invent a company, metric,
+tech, or number to fill a widget.
 """
 
 
 def parse_widget_block(full_text: str) -> tuple[str, list[dict]]:
     """Splits an LLM response into (response_text, widgets) per the WIDGET protocol above.
-    Returns the full text unchanged with an empty widget list if no WIDGET marker is
-    present, or if the marker is present but malformed (logs a warning either way)."""
+    Returns the full text unchanged with an empty widget list if no WIDGET marker is present.
+    Parses every WIDGET:<type>:<json> block found, using json.JSONDecoder.raw_decode to find
+    each JSON blob's precise end offset — a naive string split could misfire if "WIDGET:" ever
+    appeared inside a JSON string value. Stops at the first malformed block but keeps whatever
+    widgets parsed successfully before it (logs a warning either way)."""
     if "WIDGET:" not in full_text:
         return full_text, []
 
-    parts = full_text.split("WIDGET:", 1)
-    response_text = parts[0].strip()
-    widget_raw = parts[1].strip()
+    marker = "WIDGET:"
+    marker_idx = full_text.index(marker)
+    response_text = full_text[:marker_idx].strip()
 
-    try:
-        colon_idx = widget_raw.index(":")
-        widget_type = widget_raw[:colon_idx]
-        widget_data = json.loads(widget_raw[colon_idx + 1 :])
-        widgets = [{"type": "widget", "widget_type": widget_type, "data": widget_data}]
-    except Exception as exc:
-        log.warning("widget.parse.error", error=str(exc), raw=widget_raw[:200])
-        widgets = []
+    decoder = json.JSONDecoder()
+    widgets: list[dict] = []
+    pos = marker_idx + len(marker)
+
+    while True:
+        colon_idx = full_text.find(":", pos)
+        if colon_idx == -1:
+            log.warning("widget.parse.error", error="missing type separator", raw=full_text[pos : pos + 200])
+            break
+
+        widget_type = full_text[pos:colon_idx].strip()
+        json_start = colon_idx + 1
+        while json_start < len(full_text) and full_text[json_start].isspace():
+            json_start += 1
+
+        try:
+            widget_data, end_offset = decoder.raw_decode(full_text, json_start)
+        except Exception as exc:
+            log.warning("widget.parse.error", error=str(exc), raw=full_text[pos : pos + 200])
+            break
+
+        widgets.append({"type": "widget", "widget_type": widget_type, "data": widget_data})
+
+        next_marker = full_text.find(marker, end_offset)
+        if next_marker == -1:
+            break
+        pos = next_marker + len(marker)
 
     return response_text, widgets

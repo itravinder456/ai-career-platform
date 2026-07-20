@@ -16,7 +16,9 @@ class _FakeSecret:
 
 def _settings(**overrides):
     defaults = dict(
-        llm_provider="anthropic",
+        llm_provider="openai",
+        openai_api_key=None,
+        openai_model="gpt-4o",
         groq_api_key=None,
         groq_model="llama-3.3-70b-versatile",
         anthropic_api_key=None,
@@ -30,10 +32,45 @@ def _settings(**overrides):
     return SimpleNamespace(**defaults)
 
 
+def test_build_llm_openai_branch(monkeypatch):
+    fake_llm = MagicMock()
+    fake_cls = MagicMock(return_value=fake_llm)
+    monkeypatch.setattr("langchain_openai.ChatOpenAI", fake_cls)
+
+    settings = _settings(llm_provider="openai", openai_api_key=_FakeSecret("sk-test"))
+
+    result = build_llm(settings)
+
+    fake_cls.assert_called_once_with(
+        model="gpt-4o", api_key="sk-test", max_tokens=2048, temperature=0.7
+    )
+    assert result is fake_llm
+
+
+def test_build_llm_openai_missing_key_raises():
+    settings = _settings(llm_provider="openai", openai_api_key=None)
+
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        build_llm(settings)
+
+
+def test_build_llm_defaults_to_openai_for_unrecognised_provider(monkeypatch):
+    fake_llm = MagicMock()
+    fake_cls = MagicMock(return_value=fake_llm)
+    monkeypatch.setattr("langchain_openai.ChatOpenAI", fake_cls)
+
+    settings = _settings(llm_provider="not-a-real-provider", openai_api_key=_FakeSecret("sk-test"))
+
+    result = build_llm(settings)
+
+    fake_cls.assert_called_once()
+    assert result is fake_llm
+
+
 def test_build_llm_anthropic_branch(monkeypatch):
     fake_llm = MagicMock()
     fake_cls = MagicMock(return_value=fake_llm)
-    monkeypatch.setattr("app.core.llm.ChatAnthropic", fake_cls)
+    monkeypatch.setattr("langchain_anthropic.ChatAnthropic", fake_cls)
 
     settings = _settings(llm_provider="anthropic", anthropic_api_key=_FakeSecret("sk-ant-test"))
 
@@ -93,9 +130,9 @@ def test_build_llm_binds_tools_when_provided(monkeypatch):
     fake_llm = MagicMock()
     fake_llm.bind_tools.return_value = "bound-llm"
     fake_cls = MagicMock(return_value=fake_llm)
-    monkeypatch.setattr("app.core.llm.ChatAnthropic", fake_cls)
+    monkeypatch.setattr("langchain_openai.ChatOpenAI", fake_cls)
 
-    settings = _settings(llm_provider="anthropic", anthropic_api_key=_FakeSecret("sk-ant-test"))
+    settings = _settings(llm_provider="openai", openai_api_key=_FakeSecret("sk-test"))
     tools = [MagicMock()]
 
     result = build_llm(settings, tools)
@@ -107,9 +144,9 @@ def test_build_llm_binds_tools_when_provided(monkeypatch):
 def test_build_llm_no_tools_returns_unbound_llm(monkeypatch):
     fake_llm = MagicMock()
     fake_cls = MagicMock(return_value=fake_llm)
-    monkeypatch.setattr("app.core.llm.ChatAnthropic", fake_cls)
+    monkeypatch.setattr("langchain_openai.ChatOpenAI", fake_cls)
 
-    settings = _settings(llm_provider="anthropic", anthropic_api_key=_FakeSecret("sk-ant-test"))
+    settings = _settings(llm_provider="openai", openai_api_key=_FakeSecret("sk-test"))
 
     result = build_llm(settings, tools=None)
 
