@@ -7,6 +7,11 @@ or conversation position: this is a single-person portfolio site, not a multi-te
 product with per-user answers, so the simplest thing that works is reusing an identical
 question's answer wherever it recurs. Conversation continuity for follow-ups is
 preserved separately — see app/api/v1/run.py's use of aupdate_state on a hit.
+
+This module itself has no opinion on *which* questions are safe to cache — the caller
+(app/api/v1/run.py's _is_cacheable_query) only calls get_cached_turn/set_cached_turn for
+questions long enough to be self-contained, since short prompts ("why?", "go on") are
+the ones most likely to depend on whatever was just said.
 """
 
 import hashlib

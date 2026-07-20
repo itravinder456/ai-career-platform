@@ -2,8 +2,10 @@ import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import pytest
+
 from app.api.v1 import run as run_module
-from app.api.v1.run import RunRequest, _stream
+from app.api.v1.run import RunRequest, _is_cacheable_query, _stream
 
 
 class _FakeChunk:
@@ -11,23 +13,13 @@ class _FakeChunk:
         self.content = content
 
 
-class _FakeSnapshot:
-    def __init__(self, values: dict) -> None:
-        self.values = values
-
-
 class _FakeGraph:
     """Stands in for the compiled LangGraph — `_stream` only ever calls .astream()
-    (an async generator), .aupdate_state(), and .aget_state(). `has_history=False`
-    (the default) simulates a brand-new session with no prior checkpoint, matching
-    what aget_state actually returns for one (confirmed against a real InMemorySaver-
-    backed graph — snapshot.values == {} for an unseen thread_id)."""
+    (an async generator) and .aupdate_state()."""
 
-    def __init__(self, events: list, has_history: bool = False) -> None:
+    def __init__(self, events: list) -> None:
         self._events = events
         self.aupdate_state = AsyncMock()
-        values = {"messages": ["prior turn"]} if has_history else {}
-        self.aget_state = AsyncMock(return_value=_FakeSnapshot(values))
 
     async def astream(self, initial_state, config, stream_mode):
         for event in self._events:
@@ -40,6 +32,21 @@ def _fake_request(graph: _FakeGraph) -> SimpleNamespace:
 
 def _parse_events(raw_events: list[str]) -> list[dict]:
     return [json.loads(e[len("data: ") :].strip()) for e in raw_events]
+
+
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("What's your tech stack?", True),  # 4 words — exactly the boundary
+        ("Tell me about yourself", True),  # 4 words
+        ("Walk me through your most complex project", True),  # 7 words
+        ("why?", False),
+        ("go on", False),
+        ("explain more", False),
+    ],
+)
+def test_is_cacheable_query_uses_word_count(message, expected):
+    assert _is_cacheable_query(message) is expected
 
 
 async def test_stream_cache_hit_skips_the_graph_entirely(monkeypatch):
@@ -116,7 +123,7 @@ async def test_stream_error_path_never_populates_cache(monkeypatch):
             raise RuntimeError("boom")
             yield  # pragma: no cover — makes this an async generator
 
-    body = RunRequest(session_id="s1", message="anything")
+    body = RunRequest(session_id="s1", message="anything at all here")
 
     parsed = _parse_events([e async for e in _stream(body, _fake_request(_RaisingGraph([])))])
 
@@ -124,54 +131,35 @@ async def test_stream_error_path_never_populates_cache(monkeypatch):
     set_cached_turn.assert_not_awaited()
 
 
-# ── Mid-conversation: the response cache must never be consulted or populated ──
+# ── Short prompts: the response cache must never be consulted or populated ─────
 
 
-async def test_stream_mid_conversation_never_checks_the_response_cache(monkeypatch):
+async def test_stream_short_prompt_never_checks_the_response_cache(monkeypatch):
     get_cached_turn = AsyncMock(return_value=("Would-be cached answer.", []))
     monkeypatch.setattr(run_module, "get_cached_turn", get_cached_turn)
     monkeypatch.setattr(run_module, "set_cached_turn", AsyncMock())
 
-    events = [("messages", (_FakeChunk("A fresh, context-aware answer."), {"langgraph_node": "respond"}))]
-    graph = _FakeGraph(events=events, has_history=True)
-    body = RunRequest(session_id="s1", message="what's your tech stack")
+    events = [("messages", (_FakeChunk("A fresh answer."), {"langgraph_node": "respond"}))]
+    graph = _FakeGraph(events=events)
+    body = RunRequest(session_id="s1", message="why?")
 
     parsed = _parse_events([e async for e in _stream(body, _fake_request(graph))])
 
     get_cached_turn.assert_not_awaited()
     token_events = [e for e in parsed if e["type"] == "token"]
-    assert "".join(e["content"] for e in token_events) == "A fresh, context-aware answer."
+    assert "".join(e["content"] for e in token_events) == "A fresh answer."
     graph.aupdate_state.assert_not_awaited()  # real graph run updates history itself
 
 
-async def test_stream_mid_conversation_never_populates_the_response_cache(monkeypatch):
+async def test_stream_short_prompt_never_populates_the_response_cache(monkeypatch):
     monkeypatch.setattr(run_module, "get_cached_turn", AsyncMock(return_value=None))
     set_cached_turn = AsyncMock()
     monkeypatch.setattr(run_module, "set_cached_turn", set_cached_turn)
 
     events = [("messages", (_FakeChunk("An answer."), {"langgraph_node": "respond"}))]
-    graph = _FakeGraph(events=events, has_history=True)
-    body = RunRequest(session_id="s1", message="what's your tech stack")
+    graph = _FakeGraph(events=events)
+    body = RunRequest(session_id="s1", message="go on")
 
     [e async for e in _stream(body, _fake_request(graph))]
 
-    set_cached_turn.assert_not_awaited()
-
-
-async def test_is_fresh_session_fails_closed_when_state_lookup_errors(monkeypatch):
-    monkeypatch.setattr(run_module, "get_cached_turn", AsyncMock(return_value=("cached", [])))
-    set_cached_turn = AsyncMock()
-    monkeypatch.setattr(run_module, "set_cached_turn", set_cached_turn)
-
-    events = [("messages", (_FakeChunk("Real answer."), {"langgraph_node": "respond"}))]
-    graph = _FakeGraph(events=events)
-    graph.aget_state = AsyncMock(side_effect=RuntimeError("checkpointer unreachable"))
-    body = RunRequest(session_id="s1", message="anything")
-
-    parsed = _parse_events([e async for e in _stream(body, _fake_request(graph))])
-
-    # Falls back to a real graph run rather than trusting a cache it couldn't verify
-    # was safe to use.
-    token_events = [e for e in parsed if e["type"] == "token"]
-    assert "".join(e["content"] for e in token_events) == "Real answer."
     set_cached_turn.assert_not_awaited()

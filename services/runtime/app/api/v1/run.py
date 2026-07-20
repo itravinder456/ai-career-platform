@@ -5,11 +5,11 @@ POST   /api/v1/run             — internal endpoint called by services/api.
                                   zero or more widget events, then done. History is loaded/saved
                                   automatically by the checkpointer, keyed by session_id.
                                   A repeated question can skip the graph entirely — see
-                                  app.core.response_cache — but only when it's the FIRST
-                                  message of a fresh session: the same question text mid-
-                                  conversation can legitimately deserve a different answer
-                                  once there's prior context, so the cache is never
-                                  consulted (read OR write) once a session has any history.
+                                  app.core.response_cache — gated on the question being
+                                  long enough to be self-contained (see
+                                  _is_cacheable_query / MIN_CACHEABLE_WORDS below), not on
+                                  conversation position, so the sidebar's suggestion chips
+                                  benefit from this even when clicked mid-chat.
 DELETE /api/v1/run/{session_id} — clears that conversation's checkpoint state.
 """
 
@@ -73,16 +73,18 @@ def _normalize_content(content: Any) -> str:
     return ""
 
 
-async def _is_fresh_session(career_graph: Any, config: dict) -> bool:
-    """True iff this session's checkpoint has no prior messages — the only case where
-    reusing a cached full answer is safe, since there's no earlier conversation turn it
-    could contradict or ignore."""
-    try:
-        snapshot = await career_graph.aget_state(config)
-    except Exception as exc:
-        log.warning("run.session_state_check_failed", error=str(exc))
-        return False  # fail closed: skip the response cache rather than risk it
-    return not snapshot.values.get("messages")
+MIN_CACHEABLE_WORDS = 4  # see docs/CACHING.md
+
+
+def _is_cacheable_query(message: str) -> bool:
+    """Short prompts ("why?", "go on", "explain more") are exactly the ones most likely
+    to lean on whatever was just said in the conversation. Real, self-contained
+    questions ("What's your tech stack?", "Tell me about yourself") read the same
+    regardless of when they're asked, which is what actually makes reusing a cached
+    answer for them safe — a word-count floor is a simpler and more useful signal for
+    that than conversation position was, and it means the sidebar's suggestion chips
+    benefit from this even when clicked mid-chat, not just as someone's first message."""
+    return len(message.split()) >= MIN_CACHEABLE_WORDS
 
 
 async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, None]:
@@ -90,9 +92,9 @@ async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, Non
 
     career_graph = request.app.state.career_graph
     config = {"configurable": {"thread_id": body.session_id}}
-    fresh_session = await _is_fresh_session(career_graph, config)
+    cacheable = _is_cacheable_query(body.message)
 
-    cached = await get_cached_turn(body.message) if fresh_session else None
+    cached = await get_cached_turn(body.message) if cacheable else None
     if cached is not None:
         response_text, widgets = cached
         log.info("run.cache_hit", session_id=body.session_id)
@@ -160,7 +162,7 @@ async def _stream(body: RunRequest, request: Request) -> AsyncGenerator[str, Non
         yield _sse({"type": "done"})
         log.info("run.done", session_id=body.session_id)
 
-        if fresh_session:
+        if cacheable:
             await set_cached_turn(body.message, "".join(full_response_parts), widgets)
 
     except Exception as exc:

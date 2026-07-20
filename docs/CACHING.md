@@ -1,6 +1,7 @@
-# Redis Response Caching — Plan
+# Redis Response Caching
 
-**Status:** proposed, not implemented. This document is for review before any code changes.
+**Status:** implemented (both tiers below). This document is the design record — read it
+for the *why*, not as a proposal awaiting approval.
 
 ## Context
 
@@ -56,17 +57,56 @@ entirely, since `embed_query` is only invoked from inside `retrieve_context`. (I
 bulk `embed_texts` calls are a one-off batch job, not a repeated-question hot path, so
 they don't need caching.)
 
-### Tier 2 (later, optional): cache full first-turn `respond()` output
+### Tier 2: cache the full `respond()` output — `app/core/response_cache.py`
 
-Bigger win — skips `plan_tasks`, every `execute_task`, *and* the final `respond` LLM call
-entirely for a cache hit — but riskier: `respond()` builds its answer from the full
-conversation history (`state["messages"]`), so the same question can legitimately
-deserve a different answer mid-conversation (e.g. after the user already asked a related
-follow-up). This is only safe to cache reliably for the **first message of a fresh
-session** — which, conveniently, is exactly the common case: someone lands on the site
-and clicks one of the suggestion chips, or types a generic opener. Deferred to a second
-phase since it needs more careful key design (must not fire once `userHasSent` history
-exists) and isn't needed to get most of the value.
+Bigger win than Tier 1 — skips `plan_tasks`, every `execute_task`, *and* the final
+`respond` LLM call entirely for a cache hit, all three model calls one chat turn costs,
+not just the retrieval step.
+
+The risk this needs to manage: `respond()` builds its answer from the full conversation
+history, so the same question text can legitimately deserve a different answer
+mid-conversation. The first design considered here (see git history) gated this on
+conversation position — only cache the *first* message of a fresh session, checked via
+`career_graph.aget_state()`. That was rejected: the sidebar's suggestion chips
+(`frontend/src/lib/questions.ts` — "What's your tech stack?", "Tell me about yourself",
+etc.) are clickable at *any* point in a chat, not just as someone's opening message, so
+gating on position missed most of the real-world repeat-question pattern the whole
+feature exists for.
+
+**What's actually implemented instead**: gate on the question being long enough to be
+self-contained, not on where it falls in the conversation —
+`app/api/v1/run.py`'s `_is_cacheable_query`:
+
+```python
+MIN_CACHEABLE_WORDS = 4
+
+def _is_cacheable_query(message: str) -> bool:
+    return len(message.split()) >= MIN_CACHEABLE_WORDS
+```
+
+The reasoning: short prompts ("why?", "go on", "explain more") are exactly the ones most
+likely to lean on whatever was just said — they're fragments, not questions. Real,
+self-contained questions ("What's your tech stack?" — 4 words, "Tell me about
+yourself" — 4 words) read the same regardless of when they're asked, which is what
+actually makes reusing a cached answer for them safe. This is a knowingly imperfect
+heuristic (a long question *can* still reference "that project" from three messages ago;
+a short one is occasionally genuinely standalone) — accepted deliberately, since this is
+a single-person portfolio site, not a system serving meaningfully different answers per
+visitor. The threshold (4 words) is a judgment call, easy to retune in one place if it
+turns out too loose or too strict in practice.
+
+Both the *read* and the *write* are gated on `_is_cacheable_query` — a short prompt's
+answer never populates the cache either, so it can't later get served (wrongly) as a
+cached answer to someone else's short prompt.
+
+**Conversation continuity on a hit**: even though the graph never runs, the turn still
+needs to exist in that session's history for later follow-ups to have context. `_stream`
+calls `career_graph.aupdate_state(config, {"messages": [HumanMessage(...),
+AIMessage(...)]})` to inject the Q&A pair directly into the checkpointer — confirmed
+against a real `InMemorySaver`-backed graph that this correctly appends to existing
+history (or initializes it, for a fresh session) without executing any node. Wrapped in
+try/except: if the history write fails, the user still got their (already-sent) answer,
+just logged as `run.cache_hit.history_update_failed` rather than surfaced as an error.
 
 ## Design
 
@@ -118,7 +158,7 @@ Log `cache.hit` / `cache.miss` (structlog, matching the rest of the codebase's
 `log.info("event.name", ...)` convention) so there's an actual hit-rate number to look
 at before deciding whether Tier 2 is worth the added complexity.
 
-## Infra wiring needed (currently missing)
+## Infra wiring (done)
 
 - `services/runtime/pyproject.toml` — add `redis` as a dependency (match
   `services/api/pyproject.toml`'s `redis>=8.0.1` pin).
@@ -138,25 +178,29 @@ No new AWS resources, no free-tier budget impact — this is entirely reusing
 infrastructure that's already provisioned and paid for (nothing, since Redis is
 self-hosted) but sitting idle.
 
-## Explicitly out of scope for this pass
+## Explicitly out of scope
 
 - **Semantic/fuzzy cache matching** (e.g. embedding-similarity lookup instead of exact
   normalized-text match) — real value for catching near-duplicate phrasings of the same
   question, but real complexity (needs a vector similarity search against cached keys,
   a similarity threshold to tune). Worth a follow-up once exact-match hit rate is
   measured and shows headroom for it.
-- **Tier 2** (full first-turn response caching) — see above, deferred until Tier 1's
-  actual hit rate justifies the added complexity.
 - **Cross-session personalization awareness** — none of this changes based on who's
   asking; the cache is deliberately question-text-keyed, not session-keyed.
+- **Retuning `MIN_CACHEABLE_WORDS`** based on real hit-rate data — 4 was a reasonable
+  starting judgment call, not a measured value. Revisit once `cache.hit`/`cache.miss`/
+  `run.cache_hit` logs show real traffic patterns.
 
-## Verification plan (once implemented)
+## Verification
 
-- Unit tests for `cache_get`/`cache_set` mocking the redis client, plus a
-  `retrieve_context` test asserting a second identical call doesn't hit Qdrant/OpenAI
-  again (monkeypatch `embed_query`/the Qdrant client, assert single call count).
-- A Redis-down integration test: point `REDIS_URL` at an unreachable host, assert
-  `retrieve_context` still returns real results (proves the fail-open contract holds).
-- Manual: hit the same question twice in the deployed environment, confirm the second
-  turn's `retrieve` step latency in `make prod-logs` visibly drops, and `cache.hit`
-  appears in the logs.
+- Unit tests: `tests/test_cache.py` (the low-level `cache_get`/`cache_set`, including a
+  Redis-down case proving the fail-open contract), `tests/test_retrieval.py` (Tier 1 —
+  a cache hit skips both the embedding call and the Qdrant call, a cache miss populates
+  it, a retrieval failure is never cached), `tests/test_run.py` (Tier 2 — `_is_cacheable_query`'s
+  word-count boundary, a cache hit skips the graph and still updates conversation
+  history via `aupdate_state`, a cache miss runs the graph and populates the cache, a
+  short prompt never touches the cache either way, an error is never cached).
+- Manual, once deployed: ask the same *long* question (4+ words) twice in the same
+  session — second time should return near-instantly, and `run.cache_hit` plus
+  `cache.hit` should both appear in `make prod-logs`. Ask a short follow-up
+  ("why?") and confirm it always goes through the real pipeline regardless of repetition.
