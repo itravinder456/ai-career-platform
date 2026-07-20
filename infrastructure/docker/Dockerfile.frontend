@@ -7,6 +7,13 @@ COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 
 COPY frontend .
+
+# NEXT_PUBLIC_* vars are inlined into the JS bundle at build time (webpack/Turbopack
+# replaces process.env.NEXT_PUBLIC_API_URL with a literal string during `next build`) —
+# setting it as a container-start environment variable later has no effect on already
+# -compiled client code. Must be available here, before `npm run build` runs.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────

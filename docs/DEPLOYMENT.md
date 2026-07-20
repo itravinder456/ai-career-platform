@@ -161,7 +161,7 @@ CORS_ORIGINS=["http://<elastic-ip-or-public-dns>"]
 `infrastructure/docker/docker-compose.prod.yml` (pointed at the in-compose `redis`/
 `runtime` services) — don't duplicate them in the env files.
 
-Set `PUBLIC_API_URL` in the shell environment before starting the stack — it becomes
+Set `PUBLIC_API_URL` in the shell environment **before** starting the stack — it becomes
 `NEXT_PUBLIC_API_URL`, the base URL the *browser* uses to call the API directly (not over
 the Docker network):
 ```bash
@@ -169,6 +169,15 @@ export PUBLIC_API_URL=http://<elastic-ip-or-public-dns>
 ```
 Consider adding that `export` to `~/.bashrc` (or wherever your shell loads on login) on
 the box so it's always set before running `make prod-*`.
+
+This one matters more than a typical env var: `NEXT_PUBLIC_API_URL` is baked into the
+frontend's JS bundle at **build time** (`infrastructure/docker/Dockerfile.frontend`
+takes it as a build `ARG`, passed from `docker-compose.prod.yml`'s `build.args`) — not
+read at container start. `make prod-up`/`prod-restart` always rebuild
+(`docker compose ... up -d --build`), so exporting it before those is correct and
+sufficient; just know that changing `PUBLIC_API_URL` later requires an actual rebuild of
+the `frontend` image, not merely a restart of the container — `make prod-restart`
+already does this for you.
 
 ## 5. First deploy
 
@@ -305,6 +314,24 @@ Only relevant if you chose to run ingestion (step 6) directly on the EC2 box ins
 your own machine — the box's earlier setup (git/Docker/Compose/Buildx/make) never
 installs `uv`. Fix: `curl -LsSf https://astral.sh/uv/install.sh | sh` then
 `source $HOME/.local/bin/env`.
+
+**Frontend requests still go to `localhost:8000` even after exporting `PUBLIC_API_URL`
+and restarting** — a real bug, not a timing/ordering mistake. `NEXT_PUBLIC_API_URL`
+(and every `NEXT_PUBLIC_*` var) gets inlined into the JS bundle at `next build` time —
+Next.js literally replaces `process.env.NEXT_PUBLIC_API_URL` with a hardcoded string
+during the build, in both server and client bundles. `docker-compose.prod.yml` was
+originally passing it as a container-start `environment:` value, which has no effect
+whatsoever on code that was already compiled during `docker build`, so it silently kept
+whatever the build saw — `undefined`, falling back to the `"http://localhost:8000"`
+default in `frontend/src/services/{chat,admin,profile}.ts`. Fixed by moving it to
+`Dockerfile.frontend`'s `ARG`/`ENV` (set before `RUN npm run build`) and
+`docker-compose.prod.yml`'s `build.args` instead of `environment:`. `export
+PUBLIC_API_URL=...` before `make prod-up`/`prod-restart` was always the right sequence
+(both targets rebuild via `--build`) — the bug was that the value never reached the
+build step at all, regardless of when it was exported. Verified by building the real
+image with the fix and grepping the compiled `.next/` output for the actual URL —
+present in both server and client chunks, no trace of the `localhost:8000` fallback
+remaining anywhere.
 
 ---
 

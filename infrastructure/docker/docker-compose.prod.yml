@@ -64,11 +64,14 @@ services:
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.frontend
+      args:
+        # Build ARG, not a runtime `environment:` — NEXT_PUBLIC_API_URL gets baked into
+        # the JS bundle during `next build`, so it has to be present at image build time
+        # to have any effect at all (see the comment in Dockerfile.frontend). Browser
+        # calls this directly (not over the Docker network), so it must be the public
+        # http://<elastic-ip-or-public-dns> (no domain/TLS yet), not an internal service name.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in the shell env or an .env next to this file}
     restart: unless-stopped
-    environment:
-      # Browser calls this directly (not over the Docker network) — set to
-      # http://<elastic-ip-or-public-dns> before deploying (no domain/TLS yet).
-      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in the shell env or an .env next to this file}
     depends_on:
       api:
         condition: service_healthy
