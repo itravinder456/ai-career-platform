@@ -4,7 +4,8 @@ name: ai-career-platform
 # containers here — Postgres is AWS RDS, Qdrant is Qdrant Cloud (both external, see
 # services/{api,runtime}/.env.prod). This file only runs what actually needs to live on
 # the box: redis (session cache — AWS ElastiCache isn't reliably free-tier), the three
-# app services, and Caddy for TLS termination + reverse proxy.
+# app services, and Caddy as a plain HTTP reverse proxy (no domain/TLS set up yet —
+# see Caddyfile).
 #
 # Build context is the repo root, same as docker-compose.yml, so this must be run from
 # there: `docker compose -f infrastructure/docker/docker-compose.prod.yml up -d --build`
@@ -65,22 +66,19 @@ services:
       dockerfile: infrastructure/docker/Dockerfile.frontend
     restart: unless-stopped
     environment:
-      # Browser calls this directly (not over the Docker network) — set to the real
-      # public domain, e.g. https://ai.yourdomain.com, before deploying.
+      # Browser calls this directly (not over the Docker network) — set to
+      # http://<elastic-ip-or-public-dns> before deploying (no domain/TLS yet).
       NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in the shell env or an .env next to this file}
     depends_on:
       api:
         condition: service_healthy
 
-  # ── Reverse proxy + automatic TLS ─────────────────────────────────────────
+  # ── Reverse proxy (plain HTTP for now — see Caddyfile) ────────────────────
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in the shell env — a real domain or the box's own AWS public DNS hostname both work}
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

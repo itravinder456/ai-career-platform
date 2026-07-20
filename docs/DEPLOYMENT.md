@@ -10,6 +10,11 @@ machine, straight against the production Qdrant Cloud cluster.
 > **AWS free tier covers AWS infra only.** OpenAI usage (LLM + embeddings) is billed by
 > OpenAI separately, regardless of AWS tier.
 
+> **No domain/HTTPS yet.** The site is plain HTTP over the Elastic IP or the EC2
+> instance's own AWS public DNS hostname for now — good enough to verify the deploy
+> works end to end. Adding a real domain + automatic HTTPS (Caddy already supports it,
+> just needs a `DOMAIN` pointed at by real DNS) is a later, separate step.
+
 ## Target topology
 
 ```
@@ -17,7 +22,7 @@ Internet
   │
   ▼
 EC2 (t3.micro or t4g.micro, 1 Elastic IP)
-  ├─ Caddy (reverse proxy, auto-TLS)   :80 / :443
+  ├─ Caddy (plain HTTP reverse proxy)  :80
   │    ├─ /api/*  → api      :8000
   │    └─ /       → frontend :3000
   ├─ frontend (Next.js)                :3000
@@ -29,11 +34,11 @@ AWS RDS (free tier)         — Postgres, shared by api + runtime
 Qdrant Cloud (free tier)    — vector search, shared by api + runtime + ingestion
 ```
 
-Security group on the EC2 instance: **22** (SSH, restricted to your IP), **80**, **443**.
-Nothing else — Postgres/Redis/Qdrant never need to be reachable from the public internet;
-Redis is only reached over the Docker Compose network, RDS's security group should only
-allow inbound 5432 from the EC2 instance's security group, and Qdrant Cloud is
-authenticated with an API key over HTTPS.
+Security group on the EC2 instance: **22** (SSH, restricted to your IP), **80**. Nothing
+else — Postgres/Redis/Qdrant never need to be reachable from the public internet; Redis
+is only reached over the Docker Compose network, RDS's security group should only allow
+inbound 5432 from the EC2 instance's security group, and Qdrant Cloud is authenticated
+with an API key over HTTPS.
 
 ---
 
@@ -42,7 +47,6 @@ authenticated with an API key over HTTPS.
 | What | Notes |
 |---|---|
 | AWS account (free tier) | New account gets 12 months of EC2/RDS free tier; confirm what your account actually has before picking instance sizes |
-| A domain name | Caddy needs a real DNS name pointed at the Elastic IP — it cannot issue a TLS cert for a bare IP |
 | Qdrant Cloud account | [cloud.qdrant.io](https://cloud.qdrant.io) — free tier is a 1GB cluster, no time limit |
 | OpenAI API key | Separate billing from AWS — used for both chat and embeddings in production |
 
@@ -71,16 +75,15 @@ authenticated with an API key over HTTPS.
    `python:3.12-slim`/`node:22-alpine` base images, so ARM builds fine and is worth
    using if your account's free tier includes Graviton), Amazon Linux 2023, same
    VPC/subnet as RDS.
-2. Security group: 22 from your IP only, 80 + 443 from anywhere.
+2. Security group: 22 from your IP only, 80 from anywhere.
 3. Allocate and associate an **Elastic IP** so the address survives instance restarts.
-4. Point your domain's DNS `A` record at the Elastic IP.
-5. Install git + Docker:
+4. Install git + Docker:
    ```bash
    sudo dnf install -y git docker
    sudo systemctl enable --now docker
    sudo usermod -aG docker $USER    # skip if you're operating as root; log out/in otherwise
    ```
-6. Install the Compose v2 plugin — **not** available as a dnf package on Amazon Linux
+5. Install the Compose v2 plugin — **not** available as a dnf package on Amazon Linux
    2023 (`dnf install docker-compose-plugin` 404s; there's no such package in AL2023's
    repos), so install the binary directly as AWS's own docs recommend:
    ```bash
@@ -96,7 +99,7 @@ authenticated with an API key over HTTPS.
    `docker compose` later (`/root` if you're root, `/home/ec2-user` otherwise) — if you
    switch users after this step, repeat it for that user, or install into
    `/usr/local/lib/docker/cli-plugins/` instead, which every user can see.
-7. Install the Buildx plugin — also missing from AL2023's repos, and `docker compose
+6. Install the Buildx plugin — also missing from AL2023's repos, and `docker compose
    build` (which `make prod-up` runs) needs it. Same CLI-plugin-binary approach, but
    note Buildx's release assets use Go-style arch names (`amd64`/`arm64`), not
    `uname -m`'s (`x86_64`/`aarch64`), so the mapping differs from the Compose step above:
@@ -113,42 +116,16 @@ authenticated with an API key over HTTPS.
    docker buildx version   # should print a version, not "command not found"
    ```
    (Same `$DOCKER_CONFIG`/per-user caveat as the Compose plugin above.)
-8. If a login session already had `docker` group membership added mid-session (step 5),
+7. If a login session already had `docker` group membership added mid-session (step 4),
    it won't take effect until you reconnect — `exit` and SSH back in, or run
    `newgrp docker` to activate it in the current shell, before continuing.
-9. Clone the repo onto the box:
+8. Clone the repo onto the box:
    ```bash
    git clone <repo-url>
    cd AI-Career-Platform
    ```
 
-## 4. Configure the domain
-
-`infrastructure/docker/Caddyfile` reads its domain from a `DOMAIN` env var (substituted
-at container start, see the `caddy` service in `docker-compose.prod.yml`) — nothing to
-edit in the file itself. You need a real, publicly-resolvable DNS name pointed at the
-Elastic IP; Caddy can't get a Let's Encrypt cert for a bare IP, and it only matches
-traffic for exactly the hostname it's configured with, nothing else (browsing to the
-Elastic IP or any other hostname directly will fail with a TLS error, not fall through).
-Two options, same mechanism either way:
-
-- **A domain you own** — point its DNS `A` record at the Elastic IP, then
-  `export DOMAIN=ai.yourdomain.com`.
-- **DuckDNS** (duckdns.org) — free, zero domain purchase needed. Sign in, claim a
-  subdomain, point it at the Elastic IP in DuckDNS's dashboard, then
-  `export DOMAIN=<yourname>.duckdns.org`.
-
-**Do not** use the EC2 instance's own AWS public DNS hostname
-(`ec2-<ip>.<region>.compute.amazonaws.com`, visible on the instance's detail page) — it
-looks like a real domain and *is* publicly resolvable, but Let's Encrypt explicitly
-rejects `*.compute.amazonaws.com` by policy (`rejectedIdentifier` / "forbidden by
-policy"), not a rate limit — Caddy will retry forever and never succeed. (Learned this
-the hard way — an earlier version of this doc incorrectly recommended it.)
-
-Switching domains later (DuckDNS → a real domain, or vice versa) is just re-exporting
-`DOMAIN` and `make prod-restart` — nothing else changes.
-
-## 5. Secrets
+## 4. Secrets
 
 Never commit filled-in production env files — `.gitignore` already excludes
 `**/.env.prod`. Copy each template and fill in real values:
@@ -177,25 +154,23 @@ DATABASE_URL=<same RDS endpoint as above>
 QDRANT_URL=<qdrant cloud cluster url>
 QDRANT_API_KEY=<qdrant cloud api key>
 ADMIN_SECRET_KEY=<generate fresh — python -c "import secrets; print(secrets.token_hex(32))">
-CORS_ORIGINS=["https://your-domain.example.com"]
+CORS_ORIGINS=["http://<elastic-ip-or-public-dns>"]
 ```
 
 `REDIS_URL` and `RUNTIME_URL` are already set in
 `infrastructure/docker/docker-compose.prod.yml` (pointed at the in-compose `redis`/
 `runtime` services) — don't duplicate them in the env files.
 
-Set `DOMAIN` (step 4) and `PUBLIC_API_URL` in the shell environment before starting the
-stack — `PUBLIC_API_URL` becomes `NEXT_PUBLIC_API_URL`, the base URL the *browser* uses
-to call the API directly (not over the Docker network), so it must be the same bare
-public hostname as `DOMAIN`, just with a scheme:
+Set `PUBLIC_API_URL` in the shell environment before starting the stack — it becomes
+`NEXT_PUBLIC_API_URL`, the base URL the *browser* uses to call the API directly (not over
+the Docker network):
 ```bash
-export DOMAIN=ravinder-ai.duckdns.org   # or your real domain — see step 4
-export PUBLIC_API_URL=https://$DOMAIN
+export PUBLIC_API_URL=http://<elastic-ip-or-public-dns>
 ```
-Consider adding both `export`s to `~/.bashrc` (or wherever your shell loads on login) on
-the box so they're always set before running `make prod-*`.
+Consider adding that `export` to `~/.bashrc` (or wherever your shell loads on login) on
+the box so it's always set before running `make prod-*`.
 
-## 6. First deploy
+## 5. First deploy
 
 ```bash
 make prod-up
@@ -204,11 +179,11 @@ make prod-ps      # api + runtime should show "healthy"
 
 Verify:
 ```bash
-curl -sf https://$DOMAIN/api/v1/health
+curl -sf http://<elastic-ip-or-public-dns>/api/v1/health
 ```
-and load `https://$DOMAIN` in a browser.
+and load `http://<elastic-ip-or-public-dns>` in a browser.
 
-## 7. Ingestion — populate the knowledge base
+## 6. Ingestion — populate the knowledge base
 
 Preferably run this **from your own machine**, not the EC2 box — no need to deploy
 `ingestion` as a container for a job that only runs occasionally. If you'd rather run it
@@ -238,11 +213,10 @@ question and confirm the answer is actually grounded (not the
 "knowledge base temporarily unavailable" fallback from
 `app.tools.retrieval.retrieve_context`).
 
-## 8. Verify end-to-end
+## 7. Verify end-to-end
 
-- `curl https://your-domain.example.com/api/v1/health` → `200`
-- Frontend loads over HTTPS with a valid cert (Caddy issues it automatically on first
-  request — the very first load after DNS propagates may take a few seconds longer).
+- `curl http://<elastic-ip-or-public-dns>/api/v1/health` → `200`
+- Frontend loads in a browser.
 - A real chat turn returns a grounded, non-generic answer.
 - `make prod-logs` — clean of connection errors on startup.
 - `docker stats` on the box — actual RAM headroom across `redis`/`runtime`/`api`/
@@ -256,18 +230,18 @@ question and confirm the answer is actually grounded (not the
 ## Troubleshooting — issues hit on the first deploy
 
 Everything below actually happened deploying to a fresh Amazon Linux 2023 box. Steps
-3/6-9 above already fold the fixes in inline (so a *new* deploy shouldn't hit these) —
+3/4-7 above already fold the fixes in inline (so a *new* deploy shouldn't hit these) —
 this section is for matching an exact symptom if something still goes wrong, or
 re-deploying on a box that was set up before this doc was updated.
 
 **`git: command not found`**
 Amazon Linux 2023's base AMI doesn't include git. Fix: `sudo dnf install -y git`
-(bundled into step 5's `dnf install -y git docker` above).
+(bundled into step 4's `dnf install -y git docker` above).
 
 **`sudo dnf install -y docker-compose-plugin` → "No match for argument:
 docker-compose-plugin"**
 Not a real package in AL2023's dnf repos, despite being the standard install path on
-Ubuntu/Debian. Fix: install the Compose v2 binary directly as a CLI plugin (step 6) —
+Ubuntu/Debian. Fix: install the Compose v2 binary directly as a CLI plugin (step 5) —
 `curl` it from `docker/compose`'s GitHub releases into `~/.docker/cli-plugins/`.
 
 **`make: command not found`**
@@ -283,7 +257,7 @@ permission check entirely.
 
 **`compose build requires buildx 0.17.0 or later`**
 Same story as Compose — Buildx isn't a real AL2023 dnf package either. Fix: install it
-the same way, as a CLI-plugin binary (step 7). Note its release filenames use Go-style
+the same way, as a CLI-plugin binary (step 6). Note its release filenames use Go-style
 arch names (`amd64`/`arm64`), not `uname -m`'s (`x86_64`/`aarch64`) that the Compose
 step uses — the mapping is different between the two.
 
@@ -327,30 +301,10 @@ Postgres container, and confirmed `docker inspect`'s `.State.Health.Status` actu
 reached `healthy` with a `0` exit code — not just inferred from reading the Dockerfiles.
 
 **`uv: command not found` running ingestion**
-Only relevant if you chose to run ingestion (step 7) directly on the EC2 box instead of
+Only relevant if you chose to run ingestion (step 6) directly on the EC2 box instead of
 your own machine — the box's earlier setup (git/Docker/Compose/Buildx/make) never
 installs `uv`. Fix: `curl -LsSf https://astral.sh/uv/install.sh | sh` then
 `source $HOME/.local/bin/env`.
-
-**Browser: "This site can't provide a secure connection" / `ERR_SSL_PROTOCOL_ERROR`
-loading the EC2 public DNS hostname or Elastic IP directly**
-Caddy only matches traffic for the exact hostname it's configured with (`DOMAIN`, step
-4) — browsing to anything else (the bare Elastic IP, or a hostname `DOMAIN` isn't set
-to) has no matching site, so there's no cert to present and the TLS handshake itself
-fails, rather than falling through to a default page. Fix: make sure `DOMAIN` is
-exported to the exact hostname you're actually browsing to, then `make prod-restart` so
-`caddy` picks up the new value and requests a fresh cert for it.
-
-**`caddy` logs: "Cannot issue for \"ec2-*.compute.amazonaws.com\": The ACME server
-refuses to issue a certificate for this domain name, because it is forbidden by
-policy"**
-Not a transient failure — Let's Encrypt permanently blocklists AWS's (and other cloud
-providers') generic public DNS hostname suffixes from issuance, by policy. Caddy will
-keep retrying (every 60s, backing off) for up to 30 days and never succeed, no matter
-how long you wait. `DOMAIN` **must** be a hostname you actually control DNS for — see
-step 4 for the free DuckDNS option, or a real purchased domain. This was actually
-recommended by an earlier version of this doc as a supposedly-free shortcut; it doesn't
-work, and DuckDNS is the correct free option instead.
 
 ---
 
@@ -363,7 +317,7 @@ make prod-restart
 
 ## Updating the knowledge base
 
-Re-run step 7 (ingestion) any time `data/` (this repo's RAG source) changes — no need to
+Re-run step 6 (ingestion) any time `data/` (this repo's RAG source) changes — no need to
 touch the deployed containers, ingestion writes straight to the shared Qdrant Cloud
 cluster.
 
@@ -382,6 +336,12 @@ cluster.
 
 ## Known limitations
 
+- **No domain / HTTPS yet** — plain HTTP over the Elastic IP or AWS public DNS hostname.
+  `infrastructure/docker/Caddyfile` already supports automatic HTTPS; adding a real
+  domain later is just pointing its DNS `A` record at the Elastic IP, swapping
+  `Caddyfile`'s `:80` for that hostname, and `make prod-restart` — Caddy handles the
+  Let's Encrypt cert itself from there. Not done yet by choice — deferred until there's
+  an actual domain to point at it.
 - **No CI/CD** — deploys are manual (`git pull && make prod-restart`) for now.
 - **No auto-restart on host reboot** beyond Docker's `restart: unless-stopped` (already
   set on every service) plus `systemctl enable docker` so Docker itself comes back on
@@ -395,7 +355,7 @@ cluster.
 | File | Purpose |
 |---|---|
 | `infrastructure/docker/docker-compose.prod.yml` | Production topology |
-| `infrastructure/docker/Caddyfile` | Reverse proxy + TLS |
+| `infrastructure/docker/Caddyfile` | Reverse proxy (plain HTTP for now) |
 | `infrastructure/docker/Dockerfile.{api,runtime,frontend}` | Unchanged from local dev — already production-ready |
 | `services/{runtime,api,ingestion}/.env.prod.example` | Env var templates |
 | `docs/LOCAL_SETUP.md` | The local-dev equivalent of this doc |
