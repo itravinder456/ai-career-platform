@@ -134,13 +134,19 @@ Two options, same mechanism either way:
 
 - **A domain you own** — point its DNS `A` record at the Elastic IP, then
   `export DOMAIN=ai.yourdomain.com`.
-- **AWS's own public DNS hostname** — zero setup, no domain purchase needed. Every EC2
-  instance already has one (visible on the instance's detail page, shape
-  `ec2-<ip-with-dashes>.<region>.compute.amazonaws.com`); it's a real, publicly
-  resolvable name, so Let's Encrypt issues a cert for it exactly the same way:
-  `export DOMAIN=ec2-13-206-175-92.ap-south-1.compute.amazonaws.com` (substitute your
-  own). Switching to a real domain later is just re-exporting `DOMAIN` and restarting
-  `caddy` — nothing else changes.
+- **DuckDNS** (duckdns.org) — free, zero domain purchase needed. Sign in, claim a
+  subdomain, point it at the Elastic IP in DuckDNS's dashboard, then
+  `export DOMAIN=<yourname>.duckdns.org`.
+
+**Do not** use the EC2 instance's own AWS public DNS hostname
+(`ec2-<ip>.<region>.compute.amazonaws.com`, visible on the instance's detail page) — it
+looks like a real domain and *is* publicly resolvable, but Let's Encrypt explicitly
+rejects `*.compute.amazonaws.com` by policy (`rejectedIdentifier` / "forbidden by
+policy"), not a rate limit — Caddy will retry forever and never succeed. (Learned this
+the hard way — an earlier version of this doc incorrectly recommended it.)
+
+Switching domains later (DuckDNS → a real domain, or vice versa) is just re-exporting
+`DOMAIN` and `make prod-restart` — nothing else changes.
 
 ## 5. Secrets
 
@@ -183,7 +189,7 @@ stack — `PUBLIC_API_URL` becomes `NEXT_PUBLIC_API_URL`, the base URL the *brow
 to call the API directly (not over the Docker network), so it must be the same bare
 public hostname as `DOMAIN`, just with a scheme:
 ```bash
-export DOMAIN=ec2-13-206-175-92.ap-south-1.compute.amazonaws.com   # or your real domain
+export DOMAIN=ravinder-ai.duckdns.org   # or your real domain — see step 4
 export PUBLIC_API_URL=https://$DOMAIN
 ```
 Consider adding both `export`s to `~/.bashrc` (or wherever your shell loads on login) on
@@ -329,13 +335,22 @@ installs `uv`. Fix: `curl -LsSf https://astral.sh/uv/install.sh | sh` then
 **Browser: "This site can't provide a secure connection" / `ERR_SSL_PROTOCOL_ERROR`
 loading the EC2 public DNS hostname or Elastic IP directly**
 Caddy only matches traffic for the exact hostname it's configured with (`DOMAIN`, step
-4) — browsing to anything else (the bare Elastic IP, or the AWS public DNS hostname if
-`DOMAIN` was set to something else, or vice versa) has no matching site, so there's no
-cert to present and the TLS handshake itself fails, rather than falling through to a
-default page. Fix: make sure `DOMAIN` is exported to the exact hostname you're actually
-browsing to (step 4 — AWS's own `ec2-*.compute.amazonaws.com` public DNS name works
-fine, no need to buy a domain first), then `make prod-restart` so `caddy` picks up the
-new value and requests a fresh cert for it.
+4) — browsing to anything else (the bare Elastic IP, or a hostname `DOMAIN` isn't set
+to) has no matching site, so there's no cert to present and the TLS handshake itself
+fails, rather than falling through to a default page. Fix: make sure `DOMAIN` is
+exported to the exact hostname you're actually browsing to, then `make prod-restart` so
+`caddy` picks up the new value and requests a fresh cert for it.
+
+**`caddy` logs: "Cannot issue for \"ec2-*.compute.amazonaws.com\": The ACME server
+refuses to issue a certificate for this domain name, because it is forbidden by
+policy"**
+Not a transient failure — Let's Encrypt permanently blocklists AWS's (and other cloud
+providers') generic public DNS hostname suffixes from issuance, by policy. Caddy will
+keep retrying (every 60s, backing off) for up to 30 days and never succeed, no matter
+how long you wait. `DOMAIN` **must** be a hostname you actually control DNS for — see
+step 4 for the free DuckDNS option, or a real purchased domain. This was actually
+recommended by an earlier version of this doc as a supposedly-free shortcut; it doesn't
+work, and DuckDNS is the correct free option instead.
 
 ---
 

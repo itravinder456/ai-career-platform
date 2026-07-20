@@ -1,16 +1,17 @@
 # {$DOMAIN} is substituted from the caddy service's environment (see
 # docker-compose.prod.yml) — set it in the shell before starting the stack, e.g.:
-#   export DOMAIN=ec2-13-206-175-92.ap-south-1.compute.amazonaws.com   # AWS's own
-#                                                                       # public DNS
-#                                                                       # name works
-#                                                                       # fine — no
-#                                                                       # need to buy
-#                                                                       # a domain
-#   export DOMAIN=ai.yourdomain.com                                    # or a real one,
-#                                                                       # once you have it
+#   export DOMAIN=ravinder-ai.duckdns.org     # free DuckDNS subdomain — see
+#                                              # docs/DEPLOYMENT.md step 4
+#   export DOMAIN=ai.yourdomain.com           # or a real domain, once you have one
+#
+# Do NOT use the EC2 instance's own AWS public DNS hostname
+# (ec2-*.compute.amazonaws.com) — Let's Encrypt rejects it outright by policy
+# ("forbidden by policy" / rejectedIdentifier), not a rate limit, so it will never
+# succeed no matter how many times Caddy retries.
+#
 # Caddy needs a real, publicly-resolvable DNS name pointed at this box's Elastic IP to
-# issue a Let's Encrypt cert — it can't get one for a bare IP, and it won't match traffic
-# for any hostname other than exactly what's configured here.
+# issue a Let's Encrypt cert — it can't get one for a bare IP, and it only matches
+# traffic for exactly the hostname configured here.
 {$DOMAIN} {
 	handle /api/* {
 		reverse_proxy api:8000
