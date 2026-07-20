@@ -26,10 +26,14 @@ RUN addgroup --system app && adduser --system --ingroup app app
 
 WORKDIR /app
 
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-COPY data/resume ./data/resume
+# --chown=app:app matters here, not just cosmetic — COPY runs as root regardless of the
+# USER instruction below it, so without this every file lands root-owned. Next.js's
+# standalone server writes to .next/cache at runtime (image optimization cache etc.),
+# which fails with EACCES once USER app is active and the dir isn't already app-owned.
+COPY --from=builder --chown=app:app /app/.next/standalone ./
+COPY --from=builder --chown=app:app /app/.next/static ./.next/static
+COPY --from=builder --chown=app:app /app/public ./public
+COPY --chown=app:app data/resume ./data/resume
 
 ENV NODE_ENV=production \
     PORT=3000

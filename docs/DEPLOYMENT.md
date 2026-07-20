@@ -411,6 +411,16 @@ fails, rather than falling through to a default page. Fix: make sure `DOMAIN` is
 exported to the exact hostname you're actually browsing to, then `make prod-restart` so
 `caddy` picks up the new value and requests a fresh cert for it.
 
+**`frontend` logs: "Error: EACCES: permission denied, mkdir '/app/.next/cache'"**
+A real bug, not a runtime fluke — `Dockerfile.frontend`'s `COPY --from=builder` lines ran
+with no `--chown`, so every copied file landed owned by `root` (COPY always runs as
+root, regardless of the `USER app` instruction later in the file). At runtime, the
+Next.js standalone server tries to create `.next/cache` (image optimization cache, etc.)
+as the non-root `app` user, which has no write permission on the root-owned `.next`
+directory. Fixed by adding `--chown=app:app` to every `COPY --from=builder`/`COPY` line
+in the runtime stage. Verified locally: built the real image, ran it as the `app` user,
+confirmed `/app/.next` is now `app`-owned and `mkdir /app/.next/cache` actually succeeds.
+
 ---
 
 ## Redeploying after a code change
