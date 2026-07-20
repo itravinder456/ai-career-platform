@@ -124,14 +124,23 @@ authenticated with an API key over HTTPS.
 
 ## 4. Configure the domain
 
-Edit `infrastructure/docker/Caddyfile` on the box, replacing the placeholder with your
-real domain:
-```
-your-domain.example.com {
-    handle /api/* { reverse_proxy api:8000 }
-    handle       { reverse_proxy frontend:3000 }
-}
-```
+`infrastructure/docker/Caddyfile` reads its domain from a `DOMAIN` env var (substituted
+at container start, see the `caddy` service in `docker-compose.prod.yml`) — nothing to
+edit in the file itself. You need a real, publicly-resolvable DNS name pointed at the
+Elastic IP; Caddy can't get a Let's Encrypt cert for a bare IP, and it only matches
+traffic for exactly the hostname it's configured with, nothing else (browsing to the
+Elastic IP or any other hostname directly will fail with a TLS error, not fall through).
+Two options, same mechanism either way:
+
+- **A domain you own** — point its DNS `A` record at the Elastic IP, then
+  `export DOMAIN=ai.yourdomain.com`.
+- **AWS's own public DNS hostname** — zero setup, no domain purchase needed. Every EC2
+  instance already has one (visible on the instance's detail page, shape
+  `ec2-<ip-with-dashes>.<region>.compute.amazonaws.com`); it's a real, publicly
+  resolvable name, so Let's Encrypt issues a cert for it exactly the same way:
+  `export DOMAIN=ec2-13-206-175-92.ap-south-1.compute.amazonaws.com` (substitute your
+  own). Switching to a real domain later is just re-exporting `DOMAIN` and restarting
+  `caddy` — nothing else changes.
 
 ## 5. Secrets
 
@@ -169,14 +178,16 @@ CORS_ORIGINS=["https://your-domain.example.com"]
 `infrastructure/docker/docker-compose.prod.yml` (pointed at the in-compose `redis`/
 `runtime` services) — don't duplicate them in the env files.
 
-Set `PUBLIC_API_URL` in the shell environment before starting the stack — it becomes
-`NEXT_PUBLIC_API_URL`, the base URL the *browser* uses to call the API directly (not over
-the Docker network), so it must be the bare public domain:
+Set `DOMAIN` (step 4) and `PUBLIC_API_URL` in the shell environment before starting the
+stack — `PUBLIC_API_URL` becomes `NEXT_PUBLIC_API_URL`, the base URL the *browser* uses
+to call the API directly (not over the Docker network), so it must be the same bare
+public hostname as `DOMAIN`, just with a scheme:
 ```bash
-export PUBLIC_API_URL=https://your-domain.example.com
+export DOMAIN=ec2-13-206-175-92.ap-south-1.compute.amazonaws.com   # or your real domain
+export PUBLIC_API_URL=https://$DOMAIN
 ```
-Consider adding that `export` to `~/.bashrc` (or wherever your shell loads on login) on
-the box so it's always set before running `make prod-*`.
+Consider adding both `export`s to `~/.bashrc` (or wherever your shell loads on login) on
+the box so they're always set before running `make prod-*`.
 
 ## 6. First deploy
 
@@ -187,9 +198,9 @@ make prod-ps      # api + runtime should show "healthy"
 
 Verify:
 ```bash
-curl -sf https://your-domain.example.com/api/v1/health
+curl -sf https://$DOMAIN/api/v1/health
 ```
-and load `https://your-domain.example.com` in a browser.
+and load `https://$DOMAIN` in a browser.
 
 ## 7. Ingestion — populate the knowledge base
 
@@ -308,6 +319,23 @@ independent bugs stack here, both real, both now fixed in the repo:
 Both verified locally end-to-end: built the real image, ran it against a real (throwaway)
 Postgres container, and confirmed `docker inspect`'s `.State.Health.Status` actually
 reached `healthy` with a `0` exit code — not just inferred from reading the Dockerfiles.
+
+**`uv: command not found` running ingestion**
+Only relevant if you chose to run ingestion (step 7) directly on the EC2 box instead of
+your own machine — the box's earlier setup (git/Docker/Compose/Buildx/make) never
+installs `uv`. Fix: `curl -LsSf https://astral.sh/uv/install.sh | sh` then
+`source $HOME/.local/bin/env`.
+
+**Browser: "This site can't provide a secure connection" / `ERR_SSL_PROTOCOL_ERROR`
+loading the EC2 public DNS hostname or Elastic IP directly**
+Caddy only matches traffic for the exact hostname it's configured with (`DOMAIN`, step
+4) — browsing to anything else (the bare Elastic IP, or the AWS public DNS hostname if
+`DOMAIN` was set to something else, or vice versa) has no matching site, so there's no
+cert to present and the TLS handshake itself fails, rather than falling through to a
+default page. Fix: make sure `DOMAIN` is exported to the exact hostname you're actually
+browsing to (step 4 — AWS's own `ec2-*.compute.amazonaws.com` public DNS name works
+fine, no need to buy a domain first), then `make prod-restart` so `caddy` picks up the
+new value and requests a fresh cert for it.
 
 ---
 

@@ -1,6 +1,17 @@
-# Replace with your real domain before deploying — Caddy needs a DNS name pointed at
-# this box's Elastic IP to issue a Let's Encrypt cert; it can't get one for a bare IP.
-your-domain.example.com {
+# {$DOMAIN} is substituted from the caddy service's environment (see
+# docker-compose.prod.yml) — set it in the shell before starting the stack, e.g.:
+#   export DOMAIN=ec2-13-206-175-92.ap-south-1.compute.amazonaws.com   # AWS's own
+#                                                                       # public DNS
+#                                                                       # name works
+#                                                                       # fine — no
+#                                                                       # need to buy
+#                                                                       # a domain
+#   export DOMAIN=ai.yourdomain.com                                    # or a real one,
+#                                                                       # once you have it
+# Caddy needs a real, publicly-resolvable DNS name pointed at this box's Elastic IP to
+# issue a Let's Encrypt cert — it can't get one for a bare IP, and it won't match traffic
+# for any hostname other than exactly what's configured here.
+{$DOMAIN} {
 	handle /api/* {
 		reverse_proxy api:8000
 	}

@@ -76,6 +76,8 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in the shell env — a real domain or the box's own AWS public DNS hostname both work}
     ports:
       - "80:80"
       - "443:443"
