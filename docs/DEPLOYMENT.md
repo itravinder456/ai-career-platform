@@ -179,7 +179,31 @@ sufficient; just know that changing `PUBLIC_API_URL` later requires an actual re
 the `frontend` image, not merely a restart of the container — `make prod-restart`
 already does this for you.
 
-## 5. First deploy
+## 5. Database migrations
+
+`services/api` owns 3 real tables (`profile`, `social_links`, `profile_stats` —
+everything career-related comes from RAG over `services/ingestion`'s documents instead
+of structured rows, so those are the only ones Alembic manages) via Alembic migrations
+under `services/api/alembic/`. RDS starts empty; nothing creates these tables
+automatically. `Dockerfile.api` doesn't copy the `alembic/` directory or `alembic.ini`
+into the built image (only `app/`), so this has to run from the cloned source on the
+box, not inside the deployed container:
+
+```bash
+cd ~/ai-career-platform/services/api
+cp .env.prod .env   # alembic/env.py reads plain .env via AppSettings, not .env.prod
+uv sync
+uv run alembic upgrade head
+```
+
+(Install `uv` first if you haven't already — `curl -LsSf https://astral.sh/uv/install.sh
+| sh && source $HOME/.local/bin/env`, same as the ingestion step below.)
+
+Without this, the API container stays "healthy" (its healthcheck is a plain liveness
+ping, not a schema check) but `GET /api/v1/profile` and anything reading `profile_stats`
+(the frontend Hero's stat numbers) 500 — the table just doesn't exist yet.
+
+## 6. First deploy
 
 ```bash
 make prod-up
@@ -189,10 +213,11 @@ make prod-ps      # api + runtime should show "healthy"
 Verify:
 ```bash
 curl -sf http://<elastic-ip-or-public-dns>/api/v1/health
+curl -sf http://<elastic-ip-or-public-dns>/api/v1/profile   # confirms migrations landed
 ```
 and load `http://<elastic-ip-or-public-dns>` in a browser.
 
-## 6. Ingestion — populate the knowledge base
+## 7. Ingestion — populate the knowledge base
 
 Preferably run this **from your own machine**, not the EC2 box — no need to deploy
 `ingestion` as a container for a job that only runs occasionally. If you'd rather run it
@@ -222,7 +247,7 @@ question and confirm the answer is actually grounded (not the
 "knowledge base temporarily unavailable" fallback from
 `app.tools.retrieval.retrieve_context`).
 
-## 7. Verify end-to-end
+## 8. Verify end-to-end
 
 - `curl http://<elastic-ip-or-public-dns>/api/v1/health` → `200`
 - Frontend loads in a browser.
@@ -310,7 +335,7 @@ Postgres container, and confirmed `docker inspect`'s `.State.Health.Status` actu
 reached `healthy` with a `0` exit code — not just inferred from reading the Dockerfiles.
 
 **`uv: command not found` running ingestion**
-Only relevant if you chose to run ingestion (step 6) directly on the EC2 box instead of
+Only relevant if you chose to run ingestion (step 7) directly on the EC2 box instead of
 your own machine — the box's earlier setup (git/Docker/Compose/Buildx/make) never
 installs `uv`. Fix: `curl -LsSf https://astral.sh/uv/install.sh | sh` then
 `source $HOME/.local/bin/env`.
@@ -344,7 +369,7 @@ make prod-restart
 
 ## Updating the knowledge base
 
-Re-run step 6 (ingestion) any time `data/` (this repo's RAG source) changes — no need to
+Re-run step 7 (ingestion) any time `data/` (this repo's RAG source) changes — no need to
 touch the deployed containers, ingestion writes straight to the shared Qdrant Cloud
 cluster.
 
