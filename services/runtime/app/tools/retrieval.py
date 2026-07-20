@@ -83,6 +83,7 @@ async def retrieve_context(query: str, limit: int = RESULT_LIMIT) -> str:
         result = "\n\n".join(f"[{p.payload['source']}] {p.payload['text']}" for p in response.points)
 
     await cache_set(cache_key, result, CACHE_TTL_SECONDS)
+    log.info("cache.set", key=cache_key, ttl_seconds=CACHE_TTL_SECONDS)
     return result
 
 
