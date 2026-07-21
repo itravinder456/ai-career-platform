@@ -191,6 +191,24 @@ Internet → Caddy (:80/:443, auto-TLS) → frontend :3000
 build ARG, not a runtime env var) — Next.js resolves `NEXT_PUBLIC_*` vars during
 `next build`, not at container start.
 
+## Rate limiting & input bounds
+
+`POST /api/v1/chat` is the only route that fans out to a paid LLM call, so it's the
+one that needs protecting from a single client running up cost:
+
+- **Rate limiting** (`services/api/app/core/rate_limit.py`) — Redis-backed, fixed-window,
+  keyed by client IP (read from `X-Forwarded-For`, which Caddy sets in production; falls
+  back to the raw connection IP otherwise). Two independent windows both have to pass —
+  a per-minute cap (default 20) catches a fast bot, a per-day cap (default 300) catches
+  one that paces itself under that but keeps going all day. Like the response cache, it
+  fails open on a Redis outage rather than blocking the entire chat over an infra hiccup.
+- **Message length cap** — `ChatRequest.message` (and the runtime's own `RunRequest`, for
+  defense in depth against a direct call that skips the gateway) is capped at 2000
+  characters, rejected before it ever reaches the LLM.
+
+Both are enforced only at `services/api`, the public boundary — `services/runtime` isn't
+reachable from the internet.
+
 ## Notable tradeoffs
 
 - **SSE, not WebSockets** — the model only ever streams server → client; SSE is simpler,

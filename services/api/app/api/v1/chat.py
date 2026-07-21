@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app.clients.http import get_http_client
+from app.dependencies.rate_limit import RateLimit
 from app.dependencies.settings import Settings
 from app.schemas.chat import (
     ChatRequest,
@@ -24,11 +25,15 @@ router = APIRouter()
 
 
 @router.post("/chat")
-async def chat(body: ChatRequest, settings: Settings) -> StreamingResponse:
+async def chat(body: ChatRequest, settings: Settings, _rate_limit: RateLimit) -> StreamingResponse:
     """
     Accepts a chat message and streams the runtime's SSE response back to the
     client token-by-token. Conversation history lives entirely in runtime's
     LangGraph checkpointer (keyed by session_id) — this is just a proxy.
+
+    Rate-limited per client (see app.dependencies.rate_limit) — this is the only
+    route that fans out to a paid LLM call, so it's the one that needs protecting
+    from a single client running up cost.
     """
     return EventSourceResponse(
         _stream(body, settings),

@@ -2,12 +2,16 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
+from core.config.constants import CHAT_MESSAGE_MAX_LENGTH
 from core.models.base import AppModel
 
 
 class ChatRequest(AppModel):
     session_id: str = Field(..., min_length=1, max_length=128)
-    message: str = Field(..., min_length=1, max_length=8000)
+    # Capped well below what the LLM could handle — a recruiter question is a
+    # sentence or two, not an essay; this bounds worst-case token cost per turn
+    # and rejects obvious abuse before it reaches the runtime/LLM at all.
+    message: str = Field(..., min_length=1, max_length=CHAT_MESSAGE_MAX_LENGTH)
 
 
 class SessionClearRequest(AppModel):

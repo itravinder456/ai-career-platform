@@ -25,6 +25,7 @@ from pydantic import Field
 from app.core.response_cache import get_cached_turn, set_cached_turn
 from app.state.agent_state import AgentState
 from app.streaming import TokenWidgetSplitter
+from core.config.constants import CHAT_MESSAGE_MAX_LENGTH
 from core.logging.setup import get_logger
 from core.models.base import AppModel
 
@@ -34,7 +35,10 @@ router = APIRouter()
 
 class RunRequest(AppModel):
     session_id: str = Field(..., min_length=1)
-    message: str = Field(..., min_length=1)
+    # This endpoint is internal (only services/api calls it), which already enforces
+    # this same cap — but validating it here too means a straight curl/httpx call
+    # against runtime directly can't skip the limit and burn LLM tokens unbounded.
+    message: str = Field(..., min_length=1, max_length=CHAT_MESSAGE_MAX_LENGTH)
 
 
 @router.post("/run")

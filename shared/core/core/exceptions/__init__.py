@@ -3,6 +3,7 @@ from core.exceptions.base import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
+    RateLimitError,
     ServiceUnavailableError,
     UnauthorizedError,
     UpstreamError,
@@ -18,6 +19,7 @@ __all__ = [
     "ForbiddenError",
     "ConflictError",
     "ServiceUnavailableError",
+    "RateLimitError",
     "UpstreamError",
     "register_exception_handlers",
 ]

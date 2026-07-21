@@ -1,4 +1,8 @@
+import pytest
+from pydantic import ValidationError
+
 from app.schemas.chat import ChatRequest, SSEToken
+from core.config.constants import CHAT_MESSAGE_MAX_LENGTH
 
 
 def test_sse_token_preserves_leading_space():
@@ -28,3 +32,13 @@ def test_chat_request_still_strips_whitespace():
     # Confirms the fix is scoped to SSEToken only — AppModel's platform-wide
     # str_strip_whitespace default still applies to ordinary request models.
     assert ChatRequest(session_id="s1", message="  hello  ").message == "hello"
+
+
+def test_chat_request_accepts_message_at_max_length():
+    message = "a" * CHAT_MESSAGE_MAX_LENGTH
+    assert ChatRequest(session_id="s1", message=message).message == message
+
+
+def test_chat_request_rejects_message_over_max_length():
+    with pytest.raises(ValidationError):
+        ChatRequest(session_id="s1", message="a" * (CHAT_MESSAGE_MAX_LENGTH + 1))

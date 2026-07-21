@@ -44,3 +44,10 @@ AGENT_TIMEOUT_SECONDS = 30
 # ── Internal services ─────────────────────────────────────────────────────────
 DEFAULT_RUNTIME_URL = "http://localhost:8001"
 DEFAULT_CORS_ORIGINS = ["http://localhost:3000"]
+
+# ── Rate limiting (api) ────────────────────────────────────────────────────────
+RATE_LIMIT_PER_MINUTE = 20
+RATE_LIMIT_PER_DAY = 300
+
+# ── Chat input (api, runtime) ───────────────────────────────────────────────────
+CHAT_MESSAGE_MAX_LENGTH = 2000

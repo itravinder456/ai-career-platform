@@ -27,6 +27,8 @@ from core.config.constants import (
     JWT_EXPIRY_MINUTES,
     LANGSMITH_DEFAULT_PROJECT,
     OPENAI_DEFAULT_MODEL,
+    RATE_LIMIT_PER_DAY,
+    RATE_LIMIT_PER_MINUTE,
     REDIS_MAX_CONNECTIONS,
     SESSION_TTL_SECONDS,
 )
@@ -107,6 +109,11 @@ class AppSettings(BaseSettings):
     # ── API service ────────────────────────────────────────────────────────
     runtime_url: str = Field(default=DEFAULT_RUNTIME_URL, alias="RUNTIME_URL")
     cors_origins: list[str] = Field(default_factory=lambda: DEFAULT_CORS_ORIGINS, alias="CORS_ORIGINS")
+
+    # ── Rate limiting (api) — protects the public /chat endpoint's OpenAI/Qdrant/
+    # Postgres cost from a single client. Two independent windows, both must pass.
+    rate_limit_per_minute: int = Field(default=RATE_LIMIT_PER_MINUTE, alias="RATE_LIMIT_PER_MINUTE")
+    rate_limit_per_day: int = Field(default=RATE_LIMIT_PER_DAY, alias="RATE_LIMIT_PER_DAY")
 
     # ── Runtime service ────────────────────────────────────────────────────
     max_iterations: int = Field(default=AGENT_MAX_ITERATIONS, alias="AGENT_MAX_ITERATIONS")

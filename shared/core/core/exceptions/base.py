@@ -71,6 +71,13 @@ class ServiceUnavailableError(AppError):
 
 
 @dataclass
+class RateLimitError(AppError):
+    message: str = "Too many requests"
+    code: str = "RATE_LIMITED"
+    http_status: int = 429
+
+
+@dataclass
 class UpstreamError(AppError):
     """Raised when an internal call (api → runtime) fails."""
     # See NotFoundError above — message is derived from `service` below.
