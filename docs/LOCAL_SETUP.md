@@ -124,14 +124,17 @@ swap this for a bare `uvicorn app.main:app --reload` on Windows.
 ## 6. Ingest the knowledge base
 
 Before the chat can answer anything grounded, Qdrant needs to actually have content in
-it — add source files under `data/{resume,projects,blogs,certificates}/` and run:
+it. Source content lives in Postgres now, not `data/` — add/edit `projects`,
+`experiences`, `skills`, and `documents` (blog posts, certificates, resume text) through
+the admin panel (`/admin`) or directly against those tables, then run:
 
 ```bash
 make ingest
 ```
 
 This is a one-off offline step, not something the running services trigger themselves —
-re-run it any time `data/` changes.
+re-run it any time those rows change. `data/resume/*.pdf` is the one exception: it's a
+static asset served as a download by the frontend, unrelated to this step.
 
 ---
 

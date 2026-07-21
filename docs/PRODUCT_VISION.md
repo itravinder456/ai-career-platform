@@ -45,9 +45,12 @@ evidence for each part, and synthesize a single coherent answer — not a lookup
   (retrieval, caching, the profile lookup) degrades to a safe fallback rather than
   surfacing an error to the person chatting — a recruiter should never see a stack trace.
 - **Ship one thing at a time, not ahead of need.** Structured admin-editable data exists
-  only where it earns its keep (profile/links/stats); anything that's already covered by
-  retrieval over real documents doesn't get a redundant structured copy. Tool-calling and
-  real sub-agents are deliberately deferred rather than half-built.
+  only where it earns its keep — profile/links/stats, and (since real filtering/ranking
+  needs surfaced, see below) projects/experience/skills. It's never a *redundant* second
+  copy of the same facts: `services/ingestion` derives Qdrant's RAG index directly from
+  these same Postgres rows rather than a separately-authored write-up, so there's nothing
+  to drift out of sync. Tool-calling and real sub-agents are deliberately deferred rather
+  than half-built.
 
 ## Where this is headed
 
@@ -58,11 +61,26 @@ evidence for each part, and synthesize a single coherent answer — not a lookup
   running automatically ahead of the final answer. A later phase is expected to let the
   agent decide its own actions — e.g. pulling live GitHub activity — rather than
   everything being pre-fetched.
-- **A documents registry**: moving source documents out of the git-adjacent `data/`
-  folder into a real content-management flow (upload from the admin panel, track what's
-  been ingested, detect staleness) — see [ARCHITECTURE.md](./ARCHITECTURE.md)'s content
-  model for the specific planned shape.
+- **Resume generation from a JD**: upload a target job description and have the agent
+  select/rank the most relevant `projects`/`experiences`/`skills` rows and write a
+  tailored resume against a fixed template. This is the reason those three got real
+  structured columns instead of staying narrative-only — a resume generator needs to
+  filter/rank on `tech_stack`, dates, and impact, not re-parse prose. Retrieval strategy,
+  template rendering, and where the flow lives are all still open.
+- **Staleness detection for ingestion**: `make ingest` is still a manual, all-or-nothing
+  re-embed with no notion of "what actually changed since last time" — a content-hash or
+  `updated_at` comparison per row would make it incremental.
+- **Production hosting for the resume PDF**: the admin panel can already replace the
+  resume (`POST /api/v1/documents/resume/upload`), but it writes to `data/resume/` on
+  the `api` container's filesystem, which isn't shared with the `frontend` container
+  that actually serves it in production — see [ARCHITECTURE.md](./ARCHITECTURE.md)'s
+  content model for the specific gap and the two fixes under consideration.
 
-None of the above is implemented yet — they're the direction, not a promise of what
-exists today. What's actually built is documented as fact in
-[ARCHITECTURE.md](./ARCHITECTURE.md); this document is scope and intent, not a changelog.
+The documents registry described in earlier drafts of this section — admin-edited
+content instead of git-adjacent files, with per-row tracking — is the part that's now
+built: `projects`/`experiences`/`skills`/`documents` all live in Postgres, admin-edited,
+with `services/ingestion` deriving Qdrant from those rows directly. What's still open is
+listed above, not the registry itself.
+
+What's actually built is documented as fact in [ARCHITECTURE.md](./ARCHITECTURE.md);
+this document is scope and intent, not a changelog.

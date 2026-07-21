@@ -1,45 +1,89 @@
-from pathlib import Path
+from contextlib import asynccontextmanager
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock
 
-from app.loader import load_documents
+from app import loader
 
 
-def test_load_documents_dispatches_by_extension_and_skips_unsupported(tmp_path):
-    resume_dir = tmp_path / "resume"
-    resume_dir.mkdir()
-    (resume_dir / "profile.md").write_text("# Profile\n\nSome text.", encoding="utf-8")
-    (resume_dir / "notes.rtf").write_text("unsupported format", encoding="utf-8")
+def _fake_session_factory(rows_per_query: list[list[tuple]]):
+    """Builds a fake `factory()` async context manager whose session.execute()
+    returns each entry of `rows_per_query` in turn, one per call — mirroring
+    the fixed call order in load_documents_from_db (projects, experiences,
+    skills, documents)."""
+    session = MagicMock()
+    results = [MagicMock(all=MagicMock(return_value=rows)) for rows in rows_per_query]
+    session.execute = AsyncMock(side_effect=results)
 
-    documents = load_documents(data_dir=tmp_path)
+    @asynccontextmanager
+    async def factory():
+        yield session
+
+    return factory
+
+
+async def test_load_documents_from_db_serializes_all_row_types(monkeypatch):
+    project_rows = [
+        ("elsa-ai-assistant", "Elsa AI Assistant", "Flagship platform.", "Full description.", ["Python", "FastAPI"], ["35% faster"]),
+    ]
+    experience_rows = [
+        ("EPAM Systems", "Senior Software Engineer", None, ["Did X"], ["Python"], date(2024, 1, 1), None),
+    ]
+    skill_rows = [("RAG", "AI / LLM"), ("LangGraph", "AI / LLM"), ("Docker", "Data & Cloud")]
+    document_rows = [(1, "resume", "My Resume", "Resume body text.")]
+
+    monkeypatch.setattr(
+        loader,
+        "get_session_factory",
+        lambda: _fake_session_factory([project_rows, experience_rows, skill_rows, document_rows]),
+    )
+
+    documents = await loader.load_documents_from_db()
+
+    assert len(documents) == 4
+
+    project_doc = next(d for d in documents if d.doc_type == "projects")
+    assert project_doc.source_path == "db/projects/elsa-ai-assistant"
+    assert project_doc.title == "Elsa AI Assistant"
+    assert "Tech: Python, FastAPI" in project_doc.text
+    assert "Impact: 35% faster" in project_doc.text
+
+    experience_doc = next(d for d in documents if d.doc_type == "experience")
+    assert experience_doc.source_path == "db/experiences/epam-systems"
+    assert "Senior Software Engineer at EPAM Systems (2024-01-01 - Present)" in experience_doc.text
+    assert "Achievements: Did X" in experience_doc.text
+
+    skills_doc = next(d for d in documents if d.doc_type == "skills")
+    assert skills_doc.source_path == "db/skills/all"
+    assert "AI / LLM: RAG, LangGraph" in skills_doc.text
+    assert "Data & Cloud: Docker" in skills_doc.text
+
+    generic_doc = next(d for d in documents if d.doc_type == "resume")
+    assert generic_doc.source_path == "db/documents/resume/1"
+    assert generic_doc.text == "Resume body text."
+
+
+async def test_load_documents_from_db_skips_blank_generic_bodies(monkeypatch):
+    document_rows = [(1, "blog", "Empty draft", "   "), (2, "blog", "Real post", "Actual content.")]
+
+    monkeypatch.setattr(
+        loader,
+        "get_session_factory",
+        lambda: _fake_session_factory([[], [], [], document_rows]),
+    )
+
+    documents = await loader.load_documents_from_db()
 
     assert len(documents) == 1
-    assert documents[0].source_path == str(Path("resume", "profile.md"))
-    assert documents[0].doc_type == "resume"
-    assert documents[0].title == "Profile"
+    assert documents[0].title == "Real post"
 
 
-def test_load_documents_skips_empty_files(tmp_path):
-    certificates_dir = tmp_path / "certificates"
-    certificates_dir.mkdir()
-    (certificates_dir / "empty.txt").write_text("   ", encoding="utf-8")
+async def test_load_documents_from_db_returns_empty_when_all_tables_empty(monkeypatch):
+    monkeypatch.setattr(
+        loader,
+        "get_session_factory",
+        lambda: _fake_session_factory([[], [], [], []]),
+    )
 
-    documents = load_documents(data_dir=tmp_path)
-
-    assert documents == []
-
-
-def test_load_documents_skips_missing_doc_type_dirs(tmp_path):
-    documents = load_documents(data_dir=tmp_path)
+    documents = await loader.load_documents_from_db()
 
     assert documents == []
-
-
-def test_load_documents_falls_back_to_filename_when_no_titleable_line(tmp_path):
-    # Content that survives the outer "not text" skip (non-whitespace overall) but
-    # whose only line strips to nothing once "#" characters are stripped from it.
-    projects_dir = tmp_path / "projects"
-    projects_dir.mkdir()
-    (projects_dir / "my-project.txt").write_text("####", encoding="utf-8")
-
-    documents = load_documents(data_dir=tmp_path)
-
-    assert documents[0].title == "my-project"

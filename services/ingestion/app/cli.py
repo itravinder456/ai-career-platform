@@ -4,6 +4,7 @@ from core.config import get_settings
 from core.embeddings import close_embedder
 from core.logging.setup import configure_logging, get_logger
 
+from app.db import close_db
 from app.pipeline import run_ingestion
 from app.store import close_qdrant
 
@@ -20,6 +21,7 @@ async def _main() -> None:
     finally:
         await close_embedder()
         await close_qdrant()
+        await close_db()
 
     log.info(
         "ingestion.complete",

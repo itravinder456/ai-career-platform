@@ -1,26 +1,6 @@
 from unittest.mock import MagicMock
 
-from app.readers import get_reader
 from app.readers.pdf import read_pdf_file
-from app.readers.text import read_text_file
-
-
-def test_get_reader_resolves_known_extensions():
-    assert get_reader(".md") is read_text_file
-    assert get_reader(".txt") is read_text_file
-    assert get_reader(".pdf") is read_pdf_file
-    assert get_reader(".PDF") is read_pdf_file  # case-insensitive
-
-
-def test_get_reader_unknown_extension_returns_none():
-    assert get_reader(".docx") is None
-
-
-def test_read_text_file(tmp_path):
-    path = tmp_path / "note.md"
-    path.write_text("# Title\n\nBody text.", encoding="utf-8")
-
-    assert read_text_file(path) == "# Title\n\nBody text."
 
 
 def test_read_pdf_file_joins_page_text(monkeypatch, tmp_path):

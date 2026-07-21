@@ -11,7 +11,7 @@ async def test_run_ingestion_wires_load_chunk_embed_upsert(monkeypatch):
         Document(text=duplicate_text, source_path="resume/b.md", doc_type="resume", title="B"),
         Document(text="Unique project text.", source_path="projects/x.md", doc_type="projects", title="X"),
     ]
-    monkeypatch.setattr(pipeline, "load_documents", lambda: documents)
+    monkeypatch.setattr(pipeline, "load_documents_from_db", AsyncMock(return_value=documents))
 
     ensure_collection = AsyncMock()
     monkeypatch.setattr(pipeline, "ensure_collection", ensure_collection)
@@ -41,7 +41,7 @@ async def test_run_ingestion_wires_load_chunk_embed_upsert(monkeypatch):
 
 
 async def test_run_ingestion_handles_no_documents(monkeypatch):
-    monkeypatch.setattr(pipeline, "load_documents", lambda: [])
+    monkeypatch.setattr(pipeline, "load_documents_from_db", AsyncMock(return_value=[]))
 
     ensure_collection = AsyncMock()
     monkeypatch.setattr(pipeline, "ensure_collection", ensure_collection)

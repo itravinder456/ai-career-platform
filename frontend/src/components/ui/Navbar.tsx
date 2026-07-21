@@ -22,6 +22,12 @@ export default function Navbar({
   const solid = inChat || scrolled;
   const { links } = useProfile();
 
+  const pageLinks = [
+    { href: "/projects", label: "Projects" },
+    { href: "/experience", label: "Experience" },
+    { href: "/skills", label: "Skills" },
+  ];
+
   return (
     <header
       style={{
@@ -94,6 +100,38 @@ export default function Navbar({
 
         {/* Nav links */}
         <nav style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {pageLinks.map(({ href, label }, i) => (
+            <motion.a
+              key={href}
+              href={href}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05, duration: 0.35 }}
+              whileHover={{ scale: 1.02 }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--text-muted)",
+                textDecoration: "none",
+                transition: "background 0.15s ease, color 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.background = "rgba(255,255,255,0.06)";
+                el.style.color = "var(--text-secondary)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.background = "transparent";
+                el.style.color = "var(--text-muted)";
+              }}
+            >
+              {label}
+            </motion.a>
+          ))}
+          <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 6px" }} />
           {links.map(({ id, href, label, download }, i) => (
             <motion.a
               key={label}

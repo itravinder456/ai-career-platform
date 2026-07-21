@@ -27,16 +27,27 @@ aspirational. See [PRODUCT_VISION.md](./PRODUCT_VISION.md) for the *why*, and
                             │ Postgres  │       │  Qdrant   │       │  Redis    │
                             │ chat       │       │  RAG      │       │  response │
                             │ checkpoints│       │  vectors  │       │  cache    │
+                            │ + career    │      │           │       │           │
+                            │ facts       │      │           │       │           │
                             └──────────┘       └──────────┘       └──────────┘
-                                   ▲
-                                   │ also read by
-                            ┌──────┴──────┐
-                            │  API         │  profile / social links / stats
-                            │  (admin CRUD)│
+                                   ▲                  ▲
+                                   │ also read/         │ populated by
+                                   │ written by          │
+                            ┌──────┴──────┐      ┌───────┴────────┐
+                            │  API         │      │  ingestion      │
+                            │  (admin CRUD)│      │  (offline CLI)  │
+                            │  profile /   │      └────────────────┘
+                            │  projects /  │
+                            │  experience /│
+                            │  skills /    │
+                            │  documents   │
                             └─────────────┘
 
-services/ingestion — offline CLI, not a running service — reads data/{resume,projects,
-blogs,certificates}/, chunks, embeds, upserts into Qdrant. Nothing else writes to Qdrant.
+services/ingestion — offline CLI, not a running service — reads projects/experiences/
+skills/documents straight out of Postgres (the same tables services/api's admin panel
+edits), chunks, embeds, upserts into Qdrant. Nothing else writes to Qdrant. The only file
+still on disk under data/ is data/resume/*.pdf — raw bytes served as a download, entirely
+separate from ingestion (see "Documents and the resume asset" below).
 ```
 
 Four services, one shared internal Python package:
@@ -44,9 +55,9 @@ Four services, one shared internal Python package:
 | Service | Stack | Role |
 |---|---|---|
 | `frontend/` | Next.js, TailwindCSS | Chat UI, landing page, admin panel |
-| `services/api/` | FastAPI, asyncpg, redis-py | Public gateway — proxies chat to runtime over SSE, owns the `profile`/`social_links`/`profile_stats` admin CRUD |
+| `services/api/` | FastAPI, asyncpg, redis-py | Public gateway — proxies chat to runtime over SSE, owns the `profile`/`social_links`/`profile_stats`/`projects`/`experiences`/`skills`/`documents` admin CRUD |
 | `services/runtime/` | FastAPI, LangGraph, LangChain | The actual agent — planning, retrieval, response generation |
-| `services/ingestion/` | Python CLI (uv-run, no server) | Offline pipeline: `data/` documents → chunks → embeddings → Qdrant |
+| `services/ingestion/` | Python CLI (uv-run, no server) | Offline pipeline: Postgres rows (`projects`/`experiences`/`skills`/`documents`) → chunks → embeddings → Qdrant |
 | `shared/core/` | Python package (`ravinder-ai-core`) | One `AppSettings` class, structured logging, a shared `AppError` hierarchy, `AppModel` base — imported by `api`, `runtime`, and `ingestion` so there's no per-service config drift |
 
 `services/api` never talks to Qdrant or holds conversation state — it's a thin, stateless
@@ -116,33 +127,46 @@ work, never surfaces as a user-facing error):
    hit still writes the turn into the LangGraph checkpointer directly
    (`aupdate_state`) so follow-up questions keep working.
 
-## Content model — two independent tracks
+## Content model — Postgres is authored, Qdrant is derived
 
-Structured facts and narrative documents are deliberately **not** stored the same way:
+An earlier version drew this as two *independently authored* tracks: structured facts
+in Postgres (`profile`/`social_links`/`profile_stats`) alongside free-form write-ups in
+`data/projects/*.md` that `services/ingestion` chunked into Qdrant. `experiences`/
+`projects`/`skills` briefly had their own Postgres tables too, but those were dropped —
+the same facts also lived as prose in `data/`, and nothing forced the two copies to
+match, so the structured side silently drifted out of sync with what RAG actually
+served.
 
-**Track 1 — structured facts, Postgres.** `profile`, `social_links`, `profile_stats`
-(Alembic-migrated, `services/api/app/db/models/`). Anything the UI needs to render
-directly and predictably — the landing page's name, headline, stats, links. Owned and
-edited through the admin panel (`/admin`, gated by an `X-Admin-Key` header checked
-against `ADMIN_SECRET_KEY` via `hmac.compare_digest`), read publicly via
-`GET /api/v1/profile`. `services/runtime`'s system-prompt identity block reads this same
-table directly, so there's exactly one place that knows the platform owner's name,
-location, and links.
+The current shape fixes that by making Qdrant **derived, not authored**: every table
+below is admin-edited in Postgres, and `services/ingestion` builds the entire Qdrant
+index by reading those same rows and serializing them into text — there is no second,
+independently-edited copy of anything to drift.
 
-An earlier version also gave `experiences`/`projects`/`skills` this same structured
-CRUD treatment. That was removed — those are career *facts* already covered by Track 2's
-RAG over the real resume/project write-ups, and a second structured copy risked drifting
-out of sync with the source of truth every time only one side was updated.
+**All structured/narrative content lives in Postgres** (Alembic-migrated,
+`services/api/app/db/models/`), owned and edited through the admin panel (`/admin`,
+gated by an `X-Admin-Key` header checked against `ADMIN_SECRET_KEY` via
+`hmac.compare_digest`):
 
-**Track 2 — narrative documents, Qdrant via `services/ingestion`.** Free-form written
-material — resume, project write-ups, blog posts, certificates — for the chat's
-deep/narrative answers ("walk me through your architecture", "why did you choose X").
-This is a two-stage pipeline, not a live read:
+- `profile` / `social_links` / `profile_stats` — landing-page facts (name, headline,
+  stats, links). Read publicly via `GET /api/v1/profile`; `services/runtime`'s
+  system-prompt identity block reads the same table directly.
+- `projects` / `experiences` / `skills` — real columns (`tech_stack`, `impact`,
+  `achievements`, dates, etc.), not a prose blob. This is what lets `/projects`,
+  `/experience`, and `/skills` render directly for anyone who'd rather browse than chat,
+  and what a future resume-generator (filter/rank projects against a JD) needs to query —
+  neither is possible against unstructured markdown without re-parsing it every time.
+- `documents` — a generic `doc_type`/title/body table for content that doesn't need
+  row-level structure: blog posts, certificates, and the resume's extracted text. Scoped
+  admin writes (`PUT /api/v1/documents/{doc_type}`) so editing a blog post can't touch
+  the resume row.
+
+**`services/ingestion` turns those rows into a Qdrant index** — offline, manual
+(`make ingest`), not a live read:
 
 ```
-data/{resume,projects,blogs,certificates}/ (.md, .txt, .pdf)
+Postgres (projects / experiences / skills / documents)
         │  services/ingestion — offline, manual (`make ingest`)
-        │  load → chunk → embed → upsert
+        │  load rows → serialize to text → chunk → embed → upsert
         ▼
     Qdrant
         │  services/runtime — online, per chat request
@@ -151,15 +175,34 @@ data/{resume,projects,blogs,certificates}/ (.md, .txt, .pdf)
    Chat response
 ```
 
-`services/runtime` never reads `data/` directly and never talks to `services/ingestion`
-at request time — it only ever queries an already-populated Qdrant collection. If a file
-under `data/` is added or edited but `make ingest` hasn't re-run, the chat simply won't
-know about the change yet.
+Each table serializes differently: a `projects`/`experiences` row becomes one document
+(name + description + tech stack + impact/achievements as one coherent chunk source);
+all of `skills` collapses into a *single* synthetic document grouped by category, since
+~30 near-identical one-line facts would otherwise dilute retrieval against each other
+rather than reading as one coherent answer. `services/runtime` never reads Postgres's
+content tables or `services/ingestion` directly at request time — it only ever queries
+an already-populated Qdrant collection. If a row changes but `make ingest` hasn't re-run,
+the chat simply won't know about the change yet — same staleness caveat as before, just
+with a different source of truth underneath it.
 
-**Why two tracks, not one**: structured facts need to be fast and directly editable
-field-by-field — Postgres is the right tool. Narrative material needs semantic search
-over unstructured prose — a vector store is the right tool. Making one serve both jobs
-fights the grain of both.
+**Documents and the resume asset**: `data/resume/*.pdf` is the one file still on disk —
+raw PDF bytes served as a download by the frontend's `/resume` route (see
+`frontend/src/app/resume/route.ts`), and separately re-uploadable through the admin
+panel's Documents tab (`POST /api/v1/documents/resume/upload`), which extracts the text
+into the `documents` row ingestion actually reads. That upload endpoint is a deliberate
+stopgap: `api` and `frontend` are separate Docker images in production with no shared
+volume for `data/` (see `infrastructure/docker/docker-compose.prod.yml`), so a file
+written by `api` isn't visible to the deployed `frontend` container until that's
+addressed — either a shared volume, or serving the PDF from `api` instead of `frontend`.
+Fine for local dev today; flagged, not yet fixed, for production.
+
+**Why Postgres for both structured and narrative content, with Qdrant purely derived**:
+structured facts need to be fast and directly editable field-by-field, and (for
+projects/experience/skills) filterable/rankable by a future consumer — Postgres is the
+right tool for all of that. Semantic search over the resulting prose still needs a
+vector store, but there's no reason that vector store's source should be authored
+separately from the facts admin already maintains — deriving it removes the drift risk
+entirely instead of just managing it.
 
 ## Streaming
 

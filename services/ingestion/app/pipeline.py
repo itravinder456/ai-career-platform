@@ -2,7 +2,7 @@ from core.embeddings import embed_texts
 from core.models.base import AppModel
 
 from app.chunker import chunk_documents
-from app.loader import load_documents
+from app.loader import load_documents_from_db
 from app.store import ensure_collection, upsert_chunks
 
 
@@ -14,7 +14,7 @@ class IngestionResult(AppModel):
 
 
 async def run_ingestion() -> IngestionResult:
-    documents = load_documents()
+    documents = await load_documents_from_db()
     chunks, total_generated = chunk_documents(documents)
 
     await ensure_collection()
