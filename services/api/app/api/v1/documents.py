@@ -1,4 +1,5 @@
 import io
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
@@ -15,14 +16,33 @@ from core.logging.setup import get_logger
 log = get_logger(__name__)
 router = APIRouter()
 
-# services/api/app/api/v1/documents.py -> parents[5] is the repo root. Stopgap
-# only: writes into the same data/resume/ the frontend's /resume route reads
-# from (see that route's own comment) — works as-is in local dev where every
-# service shares one checkout, but api and frontend are separate Docker images
-# in production with no shared volume for data/, so this write is invisible to
-# the deployed frontend container until that's addressed (shared volume, or
-# serve the file from this service instead).
-RESUME_DIR = Path(__file__).resolve().parents[5] / "data" / "resume"
+
+def _resolve_resume_dir() -> Path:
+    """Stopgap only (see docs/ARCHITECTURE.md's Content model section): writes
+    into the same data/resume/ the frontend's /resume route reads from, which
+    only works where the two share a filesystem — a bare `uv run` checkout, not
+    the deployed api container.
+
+    Dockerfile.api COPYs only services/api/app into the image as /app/app, with
+    nothing above it — no services/, no repo root. A hardcoded parents[N]
+    index that assumes the full monorepo depth is a real outage waiting to
+    happen: it raised IndexError at *import time* in production, taking down
+    the entire api service (every route, not just this one) since this ran the
+    moment this module loaded. RESUME_UPLOAD_DIR sidesteps that; without it,
+    fall back to somewhere on the container's own filesystem that always
+    exists rather than crash the whole service over an admin-only feature
+    that's already a documented stopgap in that environment.
+    """
+    override = os.environ.get("RESUME_UPLOAD_DIR")
+    if override:
+        return Path(override)
+    parents = Path(__file__).resolve().parents
+    if len(parents) > 5:
+        return parents[5] / "data" / "resume"
+    return Path("/tmp/resume-uploads")
+
+
+RESUME_DIR = _resolve_resume_dir()
 RESUME_FILENAME = "Varikuppala-Ravinder-Senior-AI-Platform-Engineer.pdf"
 
 
