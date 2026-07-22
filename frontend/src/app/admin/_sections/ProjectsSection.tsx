@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queryKeys";
 import { fetchProjects } from "@/services/projects";
 import { AdminAuthError, AdminProject, updateProjects } from "@/services/admin";
 import {
@@ -95,16 +97,18 @@ export default function ProjectsSection({
   adminKey: string;
   onAuthError: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const { data, isError } = useQuery({ queryKey: queryKeys.projects, queryFn: fetchProjects });
+
   const [items, setItems] = useState<ProjectForm[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
-  useEffect(() => {
-    fetchProjects()
-      .then((projects) => setItems(projects.map(toForm)))
-      .catch(() => setLoadError("Could not load projects from the API."));
-  }, []);
+  // Seed local edit state once, adjusted during render (not in an effect) —
+  // see ProfileSection.tsx for why this pattern is used here.
+  if (data && items === null) {
+    setItems(data.map(toForm));
+  }
 
   const update = (index: number, patch: Partial<ProjectForm>) => {
     if (!items) return;
@@ -126,6 +130,7 @@ export default function ProjectsSection({
     try {
       const payload = items.map((it, i) => toApi(it, i));
       await updateProjects(adminKey, payload);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       setMessage({ type: "success", text: "Projects updated." });
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -140,7 +145,11 @@ export default function ProjectsSection({
   };
 
   if (!items) {
-    return <div style={{ color: "var(--text-muted)", fontSize: 14 }}>{loadError ?? "Loading projects…"}</div>;
+    return (
+      <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
+        {isError ? "Could not load projects from the API." : "Loading projects…"}
+      </div>
+    );
   }
 
   return (

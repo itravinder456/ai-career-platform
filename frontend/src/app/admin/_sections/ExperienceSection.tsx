@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queryKeys";
 import { fetchExperiences } from "@/services/experiences";
 import { AdminAuthError, AdminExperience, updateExperiences } from "@/services/admin";
 import {
@@ -75,16 +77,18 @@ export default function ExperienceSection({
   adminKey: string;
   onAuthError: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const { data, isError } = useQuery({ queryKey: queryKeys.experiences, queryFn: fetchExperiences });
+
   const [items, setItems] = useState<ExperienceForm[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
-  useEffect(() => {
-    fetchExperiences()
-      .then((experiences) => setItems(experiences.map(toForm)))
-      .catch(() => setLoadError("Could not load experience from the API."));
-  }, []);
+  // Seed local edit state once, adjusted during render (not in an effect) —
+  // see ProfileSection.tsx for why this pattern is used here.
+  if (data && items === null) {
+    setItems(data.map(toForm));
+  }
 
   const update = (index: number, patch: Partial<ExperienceForm>) => {
     if (!items) return;
@@ -106,6 +110,7 @@ export default function ExperienceSection({
     try {
       const payload = items.map((it, i) => toApi(it, i));
       await updateExperiences(adminKey, payload);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.experiences });
       setMessage({ type: "success", text: "Experience updated." });
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -120,7 +125,11 @@ export default function ExperienceSection({
   };
 
   if (!items) {
-    return <div style={{ color: "var(--text-muted)", fontSize: 14 }}>{loadError ?? "Loading experience…"}</div>;
+    return (
+      <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
+        {isError ? "Could not load experience from the API." : "Loading experience…"}
+      </div>
+    );
   }
 
   return (

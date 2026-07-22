@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FALLBACK_SOCIAL_LINKS, SocialLink } from "@/lib/links";
 import { fetchProfile, ProfileData } from "@/services/profile";
+import { queryKeys } from "./queryKeys";
 
 interface UseProfileResult {
   profile: ProfileData | null;
@@ -10,25 +11,17 @@ interface UseProfileResult {
 }
 
 export function useProfile(): UseProfileResult {
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const { data } = useQuery({
+    queryKey: queryKeys.profile,
+    queryFn: fetchProfile,
+    // Falls back to FALLBACK_SOCIAL_LINKS below on error — the api service may
+    // be down — rather than surfacing a loading/error state in the navbar.
+    retry: false,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchProfile()
-      .then((data) => {
-        if (!cancelled) setProfile(data);
-      })
-      .catch(() => {
-        // Falls back to FALLBACK_SOCIAL_LINKS below — api service may be down.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const links: SocialLink[] = profile
-    ? profile.links.map((l) => ({ ...l, download: l.id === "resume" }))
+  const links: SocialLink[] = data
+    ? data.links.map((l) => ({ ...l, download: l.id === "resume" }))
     : FALLBACK_SOCIAL_LINKS;
 
-  return { profile, links };
+  return { profile: data ?? null, links };
 }

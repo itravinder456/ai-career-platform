@@ -212,6 +212,43 @@ it re-emits each event as a typed Pydantic schema over its own SSE stream rather
 holding any state itself. The frontend's `streamChat()` client parses that stream and
 updates the message list token-by-token.
 
+## Public frontend — browsing without chatting
+
+`/projects`, `/experience`, `/skills` (`frontend/src/app/{projects,experience,skills}/`)
+exist for the recruiter persona who'd rather scan than converse — the chat is still the
+primary interface (see `docs/PRODUCT_VISION.md`), these are the deliberate exception.
+Each reads the same public `GET /api/v1/{projects,experiences,skills}` endpoints the
+admin panel writes to — no separate content path, no risk of the two drifting.
+
+**Client-side caching — TanStack Query.** `frontend/src/app/providers.tsx` wraps the app
+in a `QueryClientProvider` (default `staleTime` 5 minutes: this data only changes via
+admin edits, never in real time, so there's no reason to refetch on every page visit).
+`frontend/src/hooks/use{Profile,Projects,Experiences,Skills,Documents}.ts` wrap the
+`fetch*` calls in `services/*.ts` with `useQuery`, keyed through the single
+`frontend/src/hooks/queryKeys.ts` module. Every admin section calls
+`queryClient.invalidateQueries` on a successful save, so an edit is reflected immediately
+without waiting out the staleTime. The page nav links in `Navbar.tsx` use `next/link`
+(client-side routing), not plain `<a>` tags — a real page reload would remount the whole
+app, including the `QueryClientProvider`, and silently defeat this caching on every
+navigation.
+
+**Shared page shell.** `frontend/src/components/ui/PageShell.tsx` gives all three pages
+the same chrome: the dot-grid/ambient-glow background and monospace "eyebrow" label
+`Hero.tsx` already established for the landing page, plus a wider (1100px) container —
+these pages reuse `ProjectCard`/`SkillGraph` (chat widgets, kept as-is) but don't force
+page-level layout into their narrower chat-sidebar sizing; `ExperienceTimeline` and
+`SkillModuleGrid` are page-only components built for the wider canvas instead.
+
+**Mobile nav.** Below 640px (`.navbar-nav-desktop`/`.navbar-mobile-toggle`/
+`.navbar-mobile-menu` in `globals.css`), the inline nav row is replaced by a hamburger
+button and a full-width dropdown — not a horizontally-scrolling strip, which was tried
+first and rejected: nothing signaled there was more to scroll to, so on a real phone the
+later links were effectively invisible. `PageShell`'s ambient glow blobs are
+fixed-pixel-width and absolutely positioned, so its root also sets `overflow-x-hidden`
+(matching `Hero.tsx`'s own root) — without it they inflate
+`document.documentElement.scrollWidth` past the viewport on narrow screens even though no
+actual *content* overflows.
+
 ## Deployment
 
 Single free-tier AWS EC2 box (Amazon Linux, Docker Compose), fronted by Caddy for
@@ -228,11 +265,20 @@ Internet → Caddy (:80/:443, auto-TLS) → frontend :3000
 - **Redis** — self-hosted in Docker on the box (session/response cache only; AWS
   ElastiCache isn't reliably free-tier).
 - **`services/ingestion`** — not a long-running container. Run manually, on demand,
-  whenever the knowledge base under `data/` changes.
+  whenever `projects`/`experiences`/`skills`/`documents` rows change (see the Content
+  model section above) — not tied to a deploy, since editing those rows through the
+  admin panel doesn't require a new release.
 
 `NEXT_PUBLIC_API_URL` is baked into the frontend's JS bundle at Docker build time (a
 build ARG, not a runtime env var) — Next.js resolves `NEXT_PUBLIC_*` vars during
 `next build`, not at container start.
+
+**Deploying a schema change**: run `make prod-migrate` (reads `services/api/.env.prod`
+for the RDS connection, applies `alembic upgrade head` from your own machine — Postgres
+being external means there's no `api` container yet to exec into) *before*
+`make prod-up`/`prod-restart`. The new `api` image queries whatever tables/columns the
+latest migration expects; deploying it against an unmigrated database 500s on every
+request that touches them, not just the new ones.
 
 ## Rate limiting & input bounds
 

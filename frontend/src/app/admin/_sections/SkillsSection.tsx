@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queryKeys";
 import { fetchSkills } from "@/services/skills";
 import { AdminAuthError, AdminSkill, updateSkills } from "@/services/admin";
 import {
@@ -41,16 +43,18 @@ export default function SkillsSection({
   adminKey: string;
   onAuthError: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const { data, isError } = useQuery({ queryKey: queryKeys.skills, queryFn: fetchSkills });
+
   const [items, setItems] = useState<SkillForm[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
-  useEffect(() => {
-    fetchSkills()
-      .then((skills) => setItems(skills.map(toForm)))
-      .catch(() => setLoadError("Could not load skills from the API."));
-  }, []);
+  // Seed local edit state once, adjusted during render (not in an effect) —
+  // see ProfileSection.tsx for why this pattern is used here.
+  if (data && items === null) {
+    setItems(data.map(toForm));
+  }
 
   const update = (index: number, patch: Partial<SkillForm>) => {
     if (!items) return;
@@ -72,6 +76,7 @@ export default function SkillsSection({
     try {
       const payload = items.map((it, i) => toApi(it, i));
       await updateSkills(adminKey, payload);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.skills });
       setMessage({ type: "success", text: "Skills updated." });
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -86,7 +91,11 @@ export default function SkillsSection({
   };
 
   if (!items) {
-    return <div style={{ color: "var(--text-muted)", fontSize: 14 }}>{loadError ?? "Loading skills…"}</div>;
+    return (
+      <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
+        {isError ? "Could not load skills from the API." : "Loading skills…"}
+      </div>
+    );
   }
 
   return (

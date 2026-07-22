@@ -1137,3 +1137,31 @@ ul li::marker {
     justify-self: end;
   }
 }
+
+/* ── Navbar — hamburger + dropdown below 640px ─────────────────────────────────
+   "Ask Ravinder" + 3 page links + up to 3 social links (7 items) plus the
+   logo don't fit one row on a phone. A horizontally-scrollable strip was
+   tried first and rejected: nothing signaled there was more to scroll to,
+   so on a real device Skills and the social links were effectively
+   invisible. A hamburger + full-width dropdown is the pattern users already
+   recognize instead of one they have to discover. */
+.navbar-mobile-toggle {
+  display: none;
+}
+.navbar-mobile-menu {
+  display: none;
+}
+@media (max-width: 640px) {
+  .navbar-inner {
+    padding: 0 16px !important;
+  }
+  .navbar-nav-desktop {
+    display: none !important;
+  }
+  .navbar-mobile-toggle {
+    display: flex !important;
+  }
+  .navbar-mobile-menu {
+    display: block;
+  }
+}

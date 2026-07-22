@@ -1,6 +1,6 @@
 .PHONY: help install dev build up down restart logs clean \
         api-shell runtime-shell db-shell redis-shell \
-        migrate test lint format sync-core ingest \
+        migrate migrate-new prod-migrate test lint format sync-core ingest \
         prod-build prod-up prod-down prod-restart prod-logs prod-ps
 
 # ── Config ─────────────────────────────────────────────────────────────────────
@@ -39,7 +39,12 @@ help:
 	@echo "    make prod-ps         Show production container status/health"
 	@echo ""
 	@echo "  Database"
-	@echo "    make migrate         Run Alembic migrations (TODO)"
+	@echo "    make migrate         Run Alembic migrations against local Postgres"
+	@echo "    make migrate-new     Autogenerate a new migration from model changes"
+	@echo "    make prod-migrate    Run Alembic migrations against production (RDS) —"
+	@echo "                         run BEFORE prod-up/prod-restart on any schema change,"
+	@echo "                         the new api image will 500 on missing tables/columns"
+	@echo "                         otherwise. Needs services/api/.env.prod filled in."
 	@echo "    make db-shell        psql into the postgres container"
 	@echo "    make redis-shell     redis-cli into the redis container"
 	@echo ""
@@ -158,6 +163,15 @@ migrate:
 migrate-new:
 	@read -p "Migration name: " name; \
 	cd services/api && $(UV) run alembic revision --autogenerate -m "$$name"
+
+# Runs from your machine against the RDS instance (Postgres isn't a container in
+# prod — see docs/ARCHITECTURE.md's Deployment section), reading DATABASE_URL from
+# services/api/.env.prod via --env-file rather than the local dev .env. Needs
+# outbound network access to RDS (same as any psql client would). Run this BEFORE
+# `make prod-up`/`prod-restart` whenever a migration has landed since the last
+# deploy — the new api image queries tables/columns a stale schema won't have yet.
+prod-migrate:
+	cd services/api && $(UV) run --env-file .env.prod alembic upgrade head
 
 # ── Quality ────────────────────────────────────────────────────────────────────
 test:

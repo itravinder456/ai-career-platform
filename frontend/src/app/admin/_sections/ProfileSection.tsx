@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queryKeys";
 import { fetchProfile, ProfileData } from "@/services/profile";
 import {
   AdminAuthError,
@@ -46,16 +48,21 @@ export default function ProfileSection({
   adminKey: string;
   onAuthError: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const { data, isError } = useQuery({ queryKey: queryKeys.profile, queryFn: fetchProfile });
+
   const [profileForm, setProfileForm] = useState<ProfileFormState | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
-  useEffect(() => {
-    fetchProfile()
-      .then((profile) => setProfileForm(toProfileForm(profile)))
-      .catch(() => setLoadError("Could not load current profile from the API."));
-  }, []);
+  // Seed local edit state once when data first arrives — adjusted during
+  // render (React's documented pattern for this), not in an effect, so it
+  // can't cause a cascading extra render. `profileForm === null` only stays
+  // true until the first successful seed, so this never re-fires after —
+  // a background refetch can't clobber in-progress edits.
+  if (data && profileForm === null) {
+    setProfileForm(toProfileForm(data));
+  }
 
   const save = async () => {
     if (!profileForm) return;
@@ -72,6 +79,7 @@ export default function ProfileSection({
         links: profileForm.links,
         stats: profileForm.stats,
       });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profile });
       setMessage({ type: "success", text: "Profile updated." });
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -120,7 +128,11 @@ export default function ProfileSection({
   };
 
   if (!profileForm) {
-    return <div style={{ color: "var(--text-muted)", fontSize: 14 }}>{loadError ?? "Loading profile…"}</div>;
+    return (
+      <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
+        {isError ? "Could not load current profile from the API." : "Loading profile…"}
+      </div>
+    );
   }
 
   return (

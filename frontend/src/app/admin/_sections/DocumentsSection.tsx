@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queryKeys";
 import { fetchDocuments } from "@/services/documents";
 import { AdminAuthError, AdminDocument, updateDocuments, uploadResume } from "@/services/admin";
 import {
@@ -45,25 +47,38 @@ function DocTypeEditor({
   adminKey: string;
   onAuthError: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const { data, isError } = useQuery({
+    queryKey: queryKeys.documents(docType),
+    queryFn: () => fetchDocuments(docType),
+  });
+
   const [items, setItems] = useState<DocForm[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchDocuments(docType)
-      .then((docs) => setItems(docs.map(toForm)))
-      .catch(() => setLoadError(`Could not load ${docType} documents from the API.`));
-  }, [docType]);
+  // Seed local edit state once, adjusted during render (not in an effect) —
+  // see ProfileSection.tsx for why this pattern is used here. Safe alongside
+  // the `key={docType}` remount in the parent below: each mount starts with
+  // items === null again, so this still only fires once per docType.
+  if (data && items === null) {
+    setItems(data.map(toForm));
+  }
 
   const handleResumeUpload = async (file: File) => {
     setUploading(true);
     setMessage(null);
     try {
       await uploadResume(adminKey, file);
-      const docs = await fetchDocuments("resume");
+      // fetchQuery, not invalidateQueries: we need the fresh rows back
+      // synchronously to reseed local form state, not just to mark the
+      // cache stale for some later background refetch.
+      const docs = await queryClient.fetchQuery({
+        queryKey: queryKeys.documents("resume"),
+        queryFn: () => fetchDocuments("resume"),
+      });
       setItems(docs.map(toForm));
       setMessage({ type: "success", text: "Resume replaced and re-extracted. Run `make ingest` to pick it up in chat." });
     } catch (err) {
@@ -99,6 +114,7 @@ function DocTypeEditor({
     try {
       const payload = items.map((it, i) => toApi(it, i));
       await updateDocuments(adminKey, docType, payload);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.documents(docType) });
       setMessage({ type: "success", text: `${docType} documents updated.` });
     } catch (err) {
       if (err instanceof AdminAuthError) {
@@ -113,7 +129,11 @@ function DocTypeEditor({
   };
 
   if (!items) {
-    return <div style={{ color: "var(--text-muted)", fontSize: 14 }}>{loadError ?? "Loading…"}</div>;
+    return (
+      <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
+        {isError ? `Could not load ${docType} documents from the API.` : "Loading…"}
+      </div>
+    );
   }
 
   return (

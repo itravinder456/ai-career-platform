@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import Providers from "./providers";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${jetbrainsMono.variable} h-full`}
     >
-      <body className="h-full antialiased">{children}</body>
+      <body className="h-full antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
