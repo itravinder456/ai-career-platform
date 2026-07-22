@@ -5,6 +5,7 @@ import PageShell from "@/components/ui/PageShell";
 import PageLoader from "@/components/ui/PageLoader";
 import ProjectCard from "@/components/widgets/ProjectCard";
 import ProjectDetail from "@/components/projects/ProjectDetail";
+import ProjectGraphPanel, { PROJECT_TOPOLOGY } from "@/components/projects/ProjectGraphPanel";
 import { useProjects } from "@/hooks/useProjects";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -12,7 +13,6 @@ const indexLabel = (i: number) => `PROJ_${String(i + 1).padStart(2, "0")}`;
 
 export default function ProjectsPage() {
   const { data: projects, isError } = useProjects();
-  const featuredIndex = projects?.findIndex((p) => p.featured) ?? -1;
 
   return (
     <PageShell
@@ -44,7 +44,7 @@ export default function ProjectsPage() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: i * 0.06, ease: EASE }}
-            style={{ gridColumn: i === featuredIndex ? "1 / -1" : undefined }}
+            style={{ gridColumn: p.featured ? "1 / -1" : undefined }}
           >
             <div
               style={{
@@ -59,7 +59,7 @@ export default function ProjectsPage() {
               }}
             >
               <span>{indexLabel(i)}</span>
-              {i === featuredIndex && (
+              {p.featured && (
                 <span
                   style={{
                     padding: "1px 8px",
@@ -86,6 +86,7 @@ export default function ProjectsPage() {
               }}
             />
             <ProjectDetail description={p.description} demoUrl={p.demo_url} />
+            {PROJECT_TOPOLOGY[p.slug] && <ProjectGraphPanel topologyId={PROJECT_TOPOLOGY[p.slug]} />}
           </motion.div>
         ))}
       </div>

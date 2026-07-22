@@ -19,7 +19,9 @@ const linkPillStyle = (muted: boolean): React.CSSProperties => ({
   borderRadius: 8,
   fontSize: 12,
   fontWeight: muted ? 500 : 600,
-  color: muted ? "var(--text-muted)" : "var(--wire-bright)",
+  // Copper, not wire — "Ask Ravinder" is the same primary action as Hero's
+  // copper CTA button, so it should carry the same accent, not a second one.
+  color: muted ? "var(--text-muted)" : "var(--copper-bright)",
   textDecoration: "none",
   transition: "background 0.15s ease, color 0.15s ease",
   whiteSpace: "nowrap",
@@ -246,7 +248,7 @@ export default function Navbar({
               <Link
                 href="/"
                 onClick={goHome}
-                style={{ padding: "12px 8px", fontSize: 14, fontWeight: 600, color: "var(--wire-bright)", textDecoration: "none" }}
+                style={{ padding: "12px 8px", fontSize: 14, fontWeight: 600, color: "var(--copper-bright)", textDecoration: "none" }}
               >
                 Ask Ravinder
               </Link>

@@ -23,7 +23,7 @@ export default function PageLoader() {
             borderRadius: "50%",
             width: 9,
             height: 9,
-            background: i === 1 ? "var(--wire)" : "var(--wire-bright)",
+            background: i === 1 ? "var(--copper)" : "var(--copper-bright)",
           }}
           animate={{
             y: [0, -8, 0],

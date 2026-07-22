@@ -11,39 +11,15 @@ export interface SkillModule {
 
 export default function SkillModuleGrid({ modules }: { modules: SkillModule[] }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))",
-        gap: 20,
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
       {modules.map((mod, i) => (
         <motion.div
           key={mod.label}
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: i * 0.07, ease: EASE }}
-          style={{
-            position: "relative",
-            borderRadius: 13,
-            padding: "18px 20px",
-            background: "linear-gradient(160deg, rgba(107,138,148,0.06) 0%, rgba(16,15,12,0.9) 60%)",
-            border: "1px solid var(--hero-line)",
-            overflow: "hidden",
-          }}
         >
-          {/* Corner bracket motif — a small techno flourish, not a border */}
-          <svg
-            aria-hidden
-            width="18"
-            height="18"
-            style={{ position: "absolute", top: 10, right: 10, opacity: 0.5 }}
-          >
-            <path d="M1 8V1H8" stroke="var(--wire-bright)" strokeWidth="1.2" fill="none" />
-          </svg>
-
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <h3
               style={{
                 fontFamily: "var(--font-tech), monospace",
@@ -51,11 +27,13 @@ export default function SkillModuleGrid({ modules }: { modules: SkillModule[] })
                 fontWeight: 600,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "var(--wire-bright)",
+                color: "var(--hero-muted)",
+                whiteSpace: "nowrap",
               }}
             >
               {mod.label}
             </h3>
+            <span style={{ flex: 1, height: 1, background: "var(--hero-line)" }} />
             <span
               style={{
                 fontFamily: "var(--font-tech), monospace",
@@ -67,21 +45,25 @@ export default function SkillModuleGrid({ modules }: { modules: SkillModule[] })
             </span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {/* Same neutral pill treatment as the tech_stack pills on
+                Projects/Experience — one tag component, reused everywhere. */}
             {mod.items.map((item) => (
-              <div key={item} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  aria-hidden
-                  style={{
-                    width: 5,
-                    height: 5,
-                    flexShrink: 0,
-                    background: "var(--copper)",
-                    transform: "rotate(45deg)",
-                  }}
-                />
-                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{item}</span>
-              </div>
+              <span
+                key={item}
+                style={{
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  background: "var(--hero-surface)",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--hero-line-bright)",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {item}
+              </span>
             ))}
           </div>
         </motion.div>

@@ -1,18 +1,29 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 
 interface InputBarProps {
   onSend: (message: string) => void;
+  onStop?: () => void;
   disabled?: boolean;
 }
 
-export default function InputBar({ onSend, disabled }: InputBarProps) {
+export default function InputBar({ onSend, onStop, disabled }: InputBarProps) {
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Refocus once a response finishes, whether the turn was started by typing
+  // here or by clicking a suggested-question chip elsewhere on the page —
+  // otherwise a chip click leaves focus on the (now-removed) chip button and
+  // continuing the conversation needs an extra click into the box first.
+  const prevDisabled = useRef(disabled);
+  useEffect(() => {
+    if (prevDisabled.current && !disabled) textareaRef.current?.focus();
+    prevDisabled.current = disabled;
+  }, [disabled]);
 
   const canSend = value.trim().length > 0 && !disabled;
 
@@ -41,7 +52,10 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
     <div
       style={{
         display: "flex",
-        alignItems: "flex-end",
+        // center, not flex-end: the button is a fixed 34px tall, but a
+        // single-line textarea is only ~22px — bottom-aligning them left a
+        // visible gap above the placeholder/typed text instead of centering it.
+        alignItems: "center",
         gap: 10,
         borderRadius: 16,
         padding: "12px 14px",
@@ -84,16 +98,22 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
         className="chat-input"
       />
 
-      {/* Send / loading button */}
+      {/* Send / stop button */}
       <AnimatePresence mode="wait">
         {disabled ? (
-          <motion.div
-            key="spinner"
+          <motion.button
+            key="stop"
+            type="button"
+            onClick={onStop}
+            aria-label="Stop generating"
             initial={{ opacity: 0, scale: 0.7 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.15 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.9 }}
             style={{
+              position: "relative",
               width: 34,
               height: 34,
               borderRadius: 10,
@@ -103,31 +123,38 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
               justifyContent: "center",
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.08)",
+              cursor: "pointer",
             }}
           >
             <svg
               width="16"
               height="16"
               viewBox="0 0 16 16"
-              style={{ animation: "spin 0.75s linear infinite" }}
+              style={{ position: "absolute", animation: "spin 0.75s linear infinite" }}
             >
               <circle
                 cx="8"
                 cy="8"
                 r="6"
                 fill="none"
-                stroke="rgba(143,176,186,0.25)"
+                stroke="rgba(224,146,90,0.25)"
                 strokeWidth="2"
               />
               <path
                 d="M8 2 A6 6 0 0 1 14 8"
                 fill="none"
-                stroke="#8fb0ba"
+                stroke="#e0925a"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
             </svg>
-          </motion.div>
+            <Square
+              size={10}
+              fill="var(--text-secondary)"
+              stroke="none"
+              style={{ position: "relative" }}
+            />
+          </motion.button>
         ) : (
           <motion.button
             key="send"

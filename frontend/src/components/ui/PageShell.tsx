@@ -10,11 +10,15 @@ export default function PageShell({
   title,
   subtitle,
   children,
+  compact = false,
 }: {
   eyebrow: string;
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  /** Tighter header spacing for utility screens (e.g. admin) that don't need
+   * the same hero-style lead-in as a public landing page. */
+  compact?: boolean;
 }) {
   return (
     // overflow-x-hidden, matching Hero.tsx's own root: the ambient glow blobs
@@ -63,7 +67,7 @@ export default function PageShell({
 
       <Navbar state="chat" />
 
-      <div className="relative z-10" style={{ maxWidth: 1100, margin: "0 auto", padding: "104px 24px 80px" }}>
+      <div className="relative z-10" style={{ maxWidth: 1100, margin: "0 auto", padding: compact ? "76px 24px 60px" : "104px 24px 80px" }}>
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -88,7 +92,7 @@ export default function PageShell({
           </p>
         </motion.div>
 
-        <div style={{ marginTop: 44 }}>{children}</div>
+        <div style={{ marginTop: compact ? 24 : 44 }}>{children}</div>
       </div>
     </div>
   );

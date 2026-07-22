@@ -24,6 +24,8 @@ const item = {
 };
 
 export default function ProjectCard({ data }: { data: ProjectData }) {
+  const isLive = data.status.toLowerCase() === "production";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -79,18 +81,32 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
             {/* Header */}
             <motion.div variants={item} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
+                {/* Copper only for the genuine "live now" signal, matching Home's
+                    LIVE badge and RuntimeGraph's active-node highlight — every other
+                    status stays neutral instead of reaching for a second accent color. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span
                     style={{
                       width: 7,
                       height: 7,
                       borderRadius: "50%",
-                      background: "var(--green)",
-                      boxShadow: "0 0 8px var(--green), 0 0 16px rgba(34,211,165,0.3)",
+                      background: isLive ? "var(--copper-bright)" : "var(--hero-muted)",
+                      boxShadow: isLive
+                        ? "0 0 8px var(--copper-bright), 0 0 16px rgba(224,146,90,0.3)"
+                        : "none",
                       flexShrink: 0,
                     }}
                   />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--green)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-tech), monospace",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: isLive ? "var(--copper-bright)" : "var(--hero-muted)",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                    }}
+                  >
                     {data.status}
                   </span>
                 </div>
@@ -145,30 +161,42 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
             </motion.p>
 
             {/* Impact grid */}
-            <motion.div variants={item}>
-              <p style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
-                Impact
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                {data.impact.map((imp) => (
-                  <div
-                    key={imp}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 6,
-                      borderRadius: 8,
-                      padding: "8px 10px",
-                      background: "rgba(107,138,148,0.07)",
-                      border: "1px solid rgba(107,138,148,0.14)",
-                    }}
-                  >
-                    <Zap size={11} style={{ color: "var(--wire-bright)", flexShrink: 0, marginTop: 1 }} />
-                    <span style={{ fontSize: 11.5, lineHeight: 1.45, color: "var(--text-secondary)" }}>{imp}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+            {data.impact.length > 0 && (
+              <motion.div variants={item}>
+                <p
+                  style={{
+                    marginBottom: 8,
+                    fontFamily: "var(--font-tech), monospace",
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--hero-muted)",
+                  }}
+                >
+                  Impact
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  {data.impact.map((imp) => (
+                    <div
+                      key={imp}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 6,
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        background: "var(--hero-surface)",
+                        border: "1px solid var(--hero-line)",
+                      }}
+                    >
+                      <Zap size={11} style={{ color: "var(--hero-muted)", flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ fontSize: 11.5, lineHeight: 1.45, color: "var(--text-secondary)" }}>{imp}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
 
             {/* Tech pills */}
             <motion.div variants={item} style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -183,9 +211,9 @@ export default function ProjectCard({ data }: { data: ProjectData }) {
                     padding: "3px 9px",
                     fontSize: 11,
                     fontWeight: 600,
-                    background: "rgba(107,138,148,0.1)",
-                    color: "var(--wire-bright)",
-                    border: "1px solid rgba(107,138,148,0.2)",
+                    background: "var(--hero-surface)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--hero-line-bright)",
                     letterSpacing: "0.01em",
                   }}
                 >

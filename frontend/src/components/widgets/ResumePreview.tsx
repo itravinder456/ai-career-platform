@@ -144,7 +144,7 @@ export default function ResumePreview({ data }: { data: ResumeData }) {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                       <div>
                         <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>{exp.role}</p>
-                        <p style={{ fontSize: 11.5, marginTop: 1, color: "var(--wire-bright)" }}>{exp.company}</p>
+                        <p style={{ fontSize: 11.5, marginTop: 1, color: "var(--text-secondary)" }}>{exp.company}</p>
                       </div>
                       <span
                         style={{

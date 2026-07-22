@@ -87,7 +87,7 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
                       fontSize: 11,
                       fontFamily: "var(--font-geist-mono), monospace",
                       fontWeight: 600,
-                      color: "var(--wire-bright)",
+                      color: "var(--copper-bright)",
                       minWidth: 34,
                       textAlign: "right",
                     }}
@@ -109,8 +109,8 @@ export default function SkillGraph({ skills }: { skills: Skill[] }) {
                   style={{
                     height: "100%",
                     borderRadius: 99,
-                    background: "linear-gradient(90deg, var(--wire) 0%, var(--wire-bright) 100%)",
-                    boxShadow: "0 0 10px rgba(107,138,148,0.45)",
+                    background: "linear-gradient(90deg, var(--copper) 0%, var(--copper-bright) 100%)",
+                    boxShadow: "0 0 10px rgba(224,146,90,0.4)",
                   }}
                   initial={{ width: 0 }}
                   animate={{ width: `${skill.level}%` }}

@@ -88,9 +88,9 @@ export default function TechStack({ categories }: { categories: Category[] }) {
                         padding: "3px 9px",
                         fontSize: 11,
                         fontWeight: 600,
-                        background: "rgba(107,138,148,0.1)",
-                        color: "var(--wire-bright)",
-                        border: "1px solid rgba(107,138,148,0.2)",
+                        background: "var(--hero-surface)",
+                        color: "var(--text-secondary)",
+                        border: "1px solid var(--hero-line-bright)",
                         letterSpacing: "0.01em",
                       }}
                     >

@@ -12,7 +12,7 @@ export default function TypingIndicator() {
           style={{
             width: 5,
             height: 5,
-            background: i === 1 ? "var(--wire)" : "var(--wire-bright)",
+            background: i === 1 ? "var(--copper)" : "var(--copper-bright)",
           }}
           animate={{
             y: [0, -5, 0],

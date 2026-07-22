@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AdminAuthError, verifyAdminKey } from "@/services/admin";
+import PageShell from "@/components/ui/PageShell";
 import { inputStyle, primaryButtonStyle } from "./_sections/shared";
 import ProfileSection from "./_sections/ProfileSection";
 import ProjectsSection from "./_sections/ProjectsSection";
@@ -56,13 +57,43 @@ export default function AdminPage() {
   // ── Lock screen ────────────────────────────────────────────────────────────
   if (!adminKey) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+      <div className="relative min-h-screen overflow-x-hidden dot-grid" style={{ background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse 80% 50% at 50% 0%, transparent 40%, var(--bg) 100%)" }}
+        />
+        <div
+          aria-hidden
+          className="absolute pointer-events-none"
+          style={{
+            top: "20%",
+            right: "18%",
+            width: 460,
+            height: 460,
+            borderRadius: "50%",
+            background: "radial-gradient(ellipse, rgba(107,138,148,0.12) 0%, transparent 68%)",
+            filter: "blur(70px)",
+          }}
+        />
+
         <form
           onSubmit={unlock}
-          style={{ width: 340, padding: 28, borderRadius: 16, border: "1px solid var(--border)", background: "var(--bg-2)" }}
+          className="relative z-10"
+          style={{
+            width: 340,
+            padding: 28,
+            borderRadius: 13,
+            border: "1px solid var(--hero-line)",
+            background: "linear-gradient(160deg, rgba(107,138,148,0.06) 0%, rgba(16,15,12,0.95) 60%)",
+          }}
         >
-          <h1 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>Admin</h1>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20 }}>
+          <div className="hero2-eyebrow" style={{ marginBottom: 10 }}>
+            <span className="dot" />
+            ADMIN.LOG
+          </div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>Admin</h1>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
             Enter the admin key to continue.
           </p>
           <input
@@ -83,30 +114,34 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", padding: "48px 24px" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)" }}>Admin</h1>
-          <button
-            onClick={lock}
-            style={{ fontSize: 12, color: "var(--text-muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}
-          >
-            Lock
-          </button>
-        </div>
-
-        <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1px solid var(--border)", flexWrap: "wrap" }}>
+    <PageShell eyebrow="ADMIN.LOG" title="Admin" subtitle="Edit profile, projects, experience, skills, and documents." compact>
+      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 32,
+          borderBottom: "1px solid var(--hero-line)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               style={{
                 padding: "8px 14px",
-                fontSize: 13,
+                fontFamily: "var(--font-tech), monospace",
+                fontSize: 12,
                 fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
                 background: "transparent",
                 border: "none",
-                borderBottom: t === tab ? "2px solid var(--accent-2)" : "2px solid transparent",
+                borderBottom: t === tab ? "2px solid var(--copper-bright)" : "2px solid transparent",
                 color: t === tab ? "var(--text-primary)" : "var(--text-muted)",
                 cursor: "pointer",
                 marginBottom: -1,
@@ -117,12 +152,31 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {tab === "Profile" && <ProfileSection adminKey={adminKey} onAuthError={lock} />}
-        {tab === "Projects" && <ProjectsSection adminKey={adminKey} onAuthError={lock} />}
-        {tab === "Experience" && <ExperienceSection adminKey={adminKey} onAuthError={lock} />}
-        {tab === "Skills" && <SkillsSection adminKey={adminKey} onAuthError={lock} />}
-        {tab === "Documents" && <DocumentsSection adminKey={adminKey} onAuthError={lock} />}
+        <button
+          onClick={lock}
+          style={{
+            fontFamily: "var(--font-tech), monospace",
+            fontSize: 11,
+            letterSpacing: "0.04em",
+            color: "var(--text-secondary)",
+            background: "transparent",
+            border: "1px solid var(--hero-line)",
+            borderRadius: 8,
+            padding: "6px 12px",
+            cursor: "pointer",
+            marginBottom: 8,
+          }}
+        >
+          LOCK
+        </button>
       </div>
-    </div>
+
+      {tab === "Profile" && <ProfileSection adminKey={adminKey} onAuthError={lock} />}
+      {tab === "Projects" && <ProjectsSection adminKey={adminKey} onAuthError={lock} />}
+      {tab === "Experience" && <ExperienceSection adminKey={adminKey} onAuthError={lock} />}
+      {tab === "Skills" && <SkillsSection adminKey={adminKey} onAuthError={lock} />}
+      {tab === "Documents" && <DocumentsSection adminKey={adminKey} onAuthError={lock} />}
+      </div>
+    </PageShell>
   );
 }

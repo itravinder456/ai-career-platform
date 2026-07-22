@@ -89,7 +89,7 @@ export default function ArchitectureCard({ layers }: { layers: Layer[] }) {
                         fontSize: 11,
                         fontWeight: 700,
                         whiteSpace: "nowrap",
-                        color: "var(--wire-bright)",
+                        color: "var(--hero-muted)",
                       }}
                     >
                       {layer.name}

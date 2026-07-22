@@ -62,6 +62,8 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   const isStreamingRef = useRef(true);
   const queuedRef = useRef<string | null>(null);
   const sendRef = useRef<(input: string) => void>(() => {});
+  const abortRef = useRef<AbortController | null>(null);
+  const currentAiIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     sessionId.current = getOrCreateSessionId();
@@ -126,18 +128,17 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
 
   const userHasSent = messages.some((m) => m.role === "user");
 
-  const send = async (input: string) => {
-    if (isStreamingRef.current) return;
-    setShowSuggestions(false);
-
-    const userMsg: Message = { id: generateId(), role: "user", content: input, timestamp: new Date() };
-    const aiId = generateId();
-    const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg, aiMsg]);
+  // Streams one assistant turn into an already-placed placeholder message
+  // (aiId) — shared by both a fresh send and a retry, so retrying a failed
+  // response doesn't have to duplicate the user's bubble to replay it.
+  const runAssistantTurn = async (input: string, aiId: string) => {
     setIsStreaming(true);
-    // Jump to bottom on a fresh send regardless of prior scroll position.
     atBottomRef.current = true;
     setAtBottom(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    currentAiIdRef.current = aiId;
 
     const collectedWidgets: Widget[] = [];
     const allDone = (steps?: Step[]) => steps?.map((s) => ({ ...s, status: "done" as const }));
@@ -179,13 +180,51 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiId
-              ? { ...m, content: `Sorry, something went wrong. ${message}`, isStreaming: false }
+              ? { ...m, content: `Sorry, something went wrong. ${message}`, isStreaming: false, isError: true }
               : m
           )
         );
         setIsStreaming(false);
       },
-    });
+    }, controller.signal);
+  };
+
+  const stop = () => {
+    // Leaves whatever content had already streamed in place (matches how
+    // ChatGPT/Claude's stop button behaves) — only fills in a placeholder if
+    // the abort landed before any tokens arrived, so the bubble isn't blank.
+    const aiId = currentAiIdRef.current;
+    if (aiId) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === aiId && !m.content ? { ...m, content: "_Stopped._" } : m))
+      );
+    }
+    abortRef.current?.abort();
+  };
+
+  const send = async (input: string) => {
+    if (isStreamingRef.current) return;
+    setShowSuggestions(false);
+
+    const userMsg: Message = { id: generateId(), role: "user", content: input, timestamp: new Date() };
+    const aiId = generateId();
+    const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true, timestamp: new Date() };
+    setMessages((prev) => [...prev, userMsg, aiMsg]);
+    await runAssistantTurn(input, aiId);
+  };
+
+  // Re-runs a failed turn in place: drops the error bubble and grows a fresh
+  // placeholder in the same spot, rather than re-appending the user's
+  // question as if it were a brand new message.
+  const retry = async (input: string, failedAiId: string) => {
+    if (isStreamingRef.current) return;
+    const aiId = generateId();
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === failedAiId ? { id: aiId, role: "assistant", content: "", isStreaming: true, timestamp: new Date() } : m
+      )
+    );
+    await runAssistantTurn(input, aiId);
   };
 
   // Keep the latest `send` in a ref (updated after commit, not during render) so the
@@ -238,7 +277,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
     !!last &&
     last.role === "assistant" &&
     !last.isStreaming &&
-    !last.content.startsWith("Sorry, something went wrong");
+    !last.isError;
   const followUps = showFollowUps ? pickFollowUps(askedLower, 3) : [];
 
   return (
@@ -267,7 +306,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
           }}
         >
           <AnimatePresence initial={false}>
-            {messages.map((msg) =>
+            {messages.map((msg, i) =>
               !userHasSent && msg.id === greetingId ? (
                 <WelcomeCard
                   key={msg.id}
@@ -277,7 +316,13 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
                   onPick={send}
                 />
               ) : (
-                <MessageBubble key={msg.id} message={msg} />
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  onRetry={
+                    msg.isError ? () => retry(messages[i - 1]?.content ?? "", msg.id) : undefined
+                  }
+                />
               )
             )}
           </AnimatePresence>
@@ -288,9 +333,13 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
         </div>
       </div>
 
-      {/* Scroll-to-bottom */}
+      {/* Scroll-to-bottom — only once a real conversation is under way. Before
+          that, the only thing below the fold is one more suggestion chip on
+          the static welcome card, and floating a "jump to latest message"
+          button over it reads as a stray, disconnected control rather than a
+          meaningful affordance. */}
       <AnimatePresence>
-        {!atBottom && (
+        {!atBottom && userHasSent && (
           <motion.button
             type="button"
             onClick={scrollToBottom}
@@ -336,7 +385,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
 
       {/* Input */}
       <div style={{ flexShrink: 0, width: "100%", maxWidth: 760, margin: "0 auto", padding: "8px 20px 20px" }}>
-        <InputBar onSend={send} disabled={isStreaming} />
+        <InputBar onSend={send} onStop={stop} disabled={isStreaming} />
         <p
           style={{
             marginTop: 8,

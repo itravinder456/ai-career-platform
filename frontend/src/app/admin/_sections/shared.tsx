@@ -6,16 +6,23 @@ export const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "rgba(255,255,255,0.03)",
+  border: "1px solid var(--hero-line)",
+  background: "var(--hero-surface)",
   color: "var(--text-primary)",
   fontSize: 14,
 };
 
+// Labels stay neutral (hero-muted), same as Skills' category headers and the
+// site's own eyebrow tag — color is reserved for genuine live/current signals
+// (see PageShell eyebrow dot, ProjectCard's "Production" status), not for
+// every small caption, which is what made the app read as wire/teal-heavy.
 export const labelStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontFamily: "var(--font-tech), monospace",
+  fontSize: 10.5,
   fontWeight: 600,
-  color: "var(--text-secondary)",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  color: "var(--hero-muted)",
   marginBottom: 6,
   display: "block",
 };
@@ -25,9 +32,9 @@ export const cardStyle: React.CSSProperties = {
   flexDirection: "column",
   gap: 16,
   padding: 24,
-  borderRadius: 16,
-  border: "1px solid var(--border)",
-  background: "var(--bg-2)",
+  borderRadius: 13,
+  border: "1px solid var(--hero-line)",
+  background: "linear-gradient(160deg, rgba(107,138,148,0.06) 0%, rgba(16,15,12,0.9) 60%)",
 };
 
 export const itemCardStyle: React.CSSProperties = {
@@ -35,26 +42,31 @@ export const itemCardStyle: React.CSSProperties = {
   flexDirection: "column",
   gap: 10,
   padding: 16,
-  borderRadius: 12,
-  border: "1px solid var(--border)",
-  background: "rgba(255,255,255,0.02)",
+  borderRadius: 10,
+  border: "1px solid var(--hero-line)",
+  background: "var(--hero-surface)",
 };
 
 export const primaryButtonStyle = (disabled: boolean): React.CSSProperties => ({
   padding: "12px 0",
   borderRadius: 8,
   border: "none",
-  background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)",
-  color: "#fff",
-  fontWeight: 600,
-  fontSize: 14,
+  background: "linear-gradient(135deg, var(--copper) 0%, var(--copper-bright) 100%)",
+  color: "var(--ink)",
+  fontWeight: 700,
+  fontSize: 13,
+  fontFamily: "var(--font-tech), monospace",
+  letterSpacing: "0.02em",
   opacity: disabled ? 0.6 : 1,
   cursor: disabled ? "not-allowed" : "pointer",
 });
 
 export const addButtonStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "var(--accent-2)",
+  fontFamily: "var(--font-tech), monospace",
+  fontSize: 11.5,
+  fontWeight: 600,
+  letterSpacing: "0.03em",
+  color: "var(--copper-bright)",
   background: "transparent",
   border: "none",
   cursor: "pointer",

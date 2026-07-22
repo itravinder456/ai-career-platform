@@ -30,6 +30,7 @@ export interface Message {
   widgets?: Widget[];
   steps?: Step[];
   isStreaming?: boolean;
+  isError?: boolean;
   timestamp: Date;
 }
 

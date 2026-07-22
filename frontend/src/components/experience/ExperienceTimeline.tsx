@@ -65,10 +65,10 @@ export default function ExperienceTimeline({ experiences }: { experiences: Exper
                   height: NODE_SIZE,
                   borderRadius: "50%",
                   background: "var(--ink)",
-                  border: `2px solid ${isCurrent ? "var(--copper-bright)" : "var(--wire-bright)"}`,
+                  border: `2px solid ${isCurrent ? "var(--copper-bright)" : "var(--hero-line-bright)"}`,
                   boxShadow: isCurrent
                     ? "0 0 0 4px rgba(224,146,90,0.16), 0 0 14px rgba(224,146,90,0.5)"
-                    : "0 0 0 4px rgba(143,176,186,0.12)",
+                    : "0 0 0 4px rgba(237,232,222,0.08)",
                   animation: isCurrent ? "pulse-glow-copper 2.4s ease-in-out infinite" : undefined,
                 }}
               />
@@ -95,7 +95,7 @@ export default function ExperienceTimeline({ experiences }: { experiences: Exper
                 }}
               >
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>{exp.title}</h3>
-                <p style={{ fontSize: 13, marginTop: 2, color: "var(--wire-bright)" }}>
+                <p style={{ fontSize: 13, marginTop: 2, color: "var(--text-secondary)" }}>
                   {exp.company}
                   {exp.location ? ` · ${exp.location}` : ""}
                 </p>
@@ -110,7 +110,7 @@ export default function ExperienceTimeline({ experiences }: { experiences: Exper
                   <ul style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8, paddingLeft: 0, listStyle: "none" }}>
                     {exp.achievements.map((a) => (
                       <li key={a} style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.6, color: "var(--text-secondary)" }}>
-                        <span style={{ color: "var(--wire-bright)", flexShrink: 0 }}>▸</span>
+                        <span style={{ color: "var(--hero-muted)", flexShrink: 0 }}>▸</span>
                         <span>{a}</span>
                       </li>
                     ))}
@@ -128,9 +128,9 @@ export default function ExperienceTimeline({ experiences }: { experiences: Exper
                           fontSize: 11,
                           fontWeight: 600,
                           fontFamily: "var(--font-tech), monospace",
-                          background: "rgba(107,138,148,0.1)",
-                          color: "var(--wire-bright)",
-                          border: "1px solid rgba(107,138,148,0.2)",
+                          background: "var(--hero-surface)",
+                          color: "var(--text-secondary)",
+                          border: "1px solid var(--hero-line-bright)",
                         }}
                       >
                         {t}

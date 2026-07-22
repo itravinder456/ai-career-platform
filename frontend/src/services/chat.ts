@@ -13,7 +13,8 @@ export interface StreamCallbacks {
 export async function streamChat(
   sessionId: string,
   message: string,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal
 ): Promise<void> {
   let completed = false;
 
@@ -29,6 +30,7 @@ export async function streamChat(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionId, message }),
+      signal,
     });
 
     if (!response.ok || !response.body) {
@@ -87,7 +89,13 @@ export async function streamChat(
       }
     }
   } catch (err) {
-    callbacks.onError(err instanceof Error ? err.message : "Network error");
+    // A user-initiated stop() aborts the fetch deliberately — that's a normal
+    // end of the turn, not a failure worth an error bubble.
+    if (err instanceof DOMException && err.name === "AbortError") {
+      // fall through to finish() in the `finally` block below
+    } else {
+      callbacks.onError(err instanceof Error ? err.message : "Network error");
+    }
   } finally {
     finish(); // always resolve — prevents isStreaming from locking up
   }
