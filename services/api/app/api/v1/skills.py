@@ -4,7 +4,7 @@ from sqlalchemy import delete, select
 from app.db.models import Skill
 from app.dependencies.auth import require_admin
 from app.dependencies.db import DB
-from app.schemas.skill import SkillIn, SkillOut, SkillsUpdate
+from app.schemas.skill import SkillOut, SkillsUpdate
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)

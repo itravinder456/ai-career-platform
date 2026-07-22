@@ -164,14 +164,17 @@ migrate-new:
 	@read -p "Migration name: " name; \
 	cd services/api && $(UV) run alembic revision --autogenerate -m "$$name"
 
-# Runs from your machine against the RDS instance (Postgres isn't a container in
-# prod — see docs/ARCHITECTURE.md's Deployment section), reading DATABASE_URL from
-# services/api/.env.prod via --env-file rather than the local dev .env. Needs
+# Runs from your machine (or the EC2 box) against the RDS instance (Postgres isn't
+# a container in prod — see docs/ARCHITECTURE.md's Deployment section). Needs
 # outbound network access to RDS (same as any psql client would). Run this BEFORE
 # `make prod-up`/`prod-restart` whenever a migration has landed since the last
 # deploy — the new api image queries tables/columns a stale schema won't have yet.
+# ALEMBIC_ENV_FILE (read by services/api/alembic/env.py) points AppSettings at
+# .env.prod instead of the local dev .env — deliberately NOT `uv run --env-file`,
+# which parses JSON-shaped values like CORS_ORIGINS differently than
+# pydantic-settings' own dotenv loading does and fails on them.
 prod-migrate:
-	cd services/api && $(UV) run --env-file .env.prod alembic upgrade head
+	cd services/api && ALEMBIC_ENV_FILE=.env.prod $(UV) run alembic upgrade head
 
 # ── Quality ────────────────────────────────────────────────────────────────────
 test:

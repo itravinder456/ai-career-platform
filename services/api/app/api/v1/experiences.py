@@ -4,7 +4,7 @@ from sqlalchemy import delete, select
 from app.db.models import Experience
 from app.dependencies.auth import require_admin
 from app.dependencies.db import DB
-from app.schemas.experience import ExperienceIn, ExperienceOut, ExperiencesUpdate
+from app.schemas.experience import ExperienceOut, ExperiencesUpdate
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)

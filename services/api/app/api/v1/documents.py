@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 from app.db.models import Document as DocumentModel
 from app.dependencies.auth import require_admin
 from app.dependencies.db import DB
-from app.schemas.document import DocumentIn, DocumentOut, DocumentsUpdate
+from app.schemas.document import DocumentOut, DocumentsUpdate
 from core.exceptions.base import ValidationError
 from core.logging.setup import get_logger
 
