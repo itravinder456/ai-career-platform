@@ -64,6 +64,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   const sendRef = useRef<(input: string) => void>(() => {});
   const abortRef = useRef<AbortController | null>(null);
   const currentAiIdRef = useRef<string | null>(null);
+  const lastNonceRef = useRef<number | null>(null);
 
   useEffect(() => {
     sessionId.current = getOrCreateSessionId();
@@ -141,6 +142,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
     currentAiIdRef.current = aiId;
 
     const collectedWidgets: Widget[] = [];
+    let collectedFollowUps: string[] = [];
     const allDone = (steps?: Step[]) => steps?.map((s) => ({ ...s, status: "done" as const }));
 
     await streamChat(sessionId.current, input, {
@@ -159,6 +161,17 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
         );
       },
       onWidget: (widget) => {
+        // The followups widget isn't a rendered visualisation like the others — it
+        // feeds FollowUpChips instead, so it's split out here rather than landing in
+        // message.widgets (WidgetRenderer would just silently no-op on it anyway, but
+        // keeping it out is more honest about what it actually is).
+        if (widget.type === "followups") {
+          const questions = (widget.data as { questions?: unknown }).questions;
+          if (Array.isArray(questions)) {
+            collectedFollowUps = questions.filter((q): q is string => typeof q === "string");
+          }
+          return;
+        }
         collectedWidgets.push(widget);
       },
       onDone: () => {
@@ -170,6 +183,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
                   isStreaming: false,
                   steps: allDone(m.steps),
                   widgets: collectedWidgets.length ? collectedWidgets : undefined,
+                  followUps: collectedFollowUps.length ? collectedFollowUps : undefined,
                 }
               : m
           )
@@ -204,6 +218,11 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
 
   const send = async (input: string) => {
     if (isStreamingRef.current) return;
+    // Set synchronously, not just via the isStreaming-state-synced effect below —
+    // that effect only runs after this render commits, leaving a window where a
+    // fast double-click (or two near-simultaneous chip presses) both pass the
+    // guard above before React catches up, firing two turns for one click.
+    isStreamingRef.current = true;
     setShowSuggestions(false);
 
     const userMsg: Message = { id: generateId(), role: "user", content: input, timestamp: new Date() };
@@ -218,6 +237,7 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
   // question as if it were a brand new message.
   const retry = async (input: string, failedAiId: string) => {
     if (isStreamingRef.current) return;
+    isStreamingRef.current = true;
     const aiId = generateId();
     setMessages((prev) =>
       prev.map((m) =>
@@ -236,9 +256,20 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
 
   // Externally-triggered questions (sidebar chips, Hero deep-link). If we're mid-stream
   // or still animating the greeting, queue and flush once free.
+  //
+  // Guarded by lastNonceRef, not just isStreamingRef: this is a mount-time effect with
+  // a real side effect (a network call), and React 18 StrictMode deliberately runs dev
+  // mounts as mount -> effects -> unmount -> effects again to catch exactly this kind of
+  // unguarded side effect. Without tracking which nonce was already processed, that
+  // replay either double-sends immediately (if isStreamingRef.current is still false on
+  // the second pass) or double-sends a moment later via the queue (if it's already true) —
+  // either way, one click producing two turns. Keying off the nonce itself makes the
+  // effect idempotent no matter how many times it's invoked for the same signal.
   useEffect(() => {
     const q = askSignal?.q?.trim();
     if (!q) return;
+    if (lastNonceRef.current === askSignal?.nonce) return;
+    lastNonceRef.current = askSignal?.nonce ?? null;
     if (isStreamingRef.current) queuedRef.current = q;
     else sendRef.current(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,7 +309,16 @@ export default function ChatWindow({ askSignal, onBusyChange }: Props) {
     last.role === "assistant" &&
     !last.isStreaming &&
     !last.isError;
-  const followUps = showFollowUps ? pickFollowUps(askedLower, 3) : [];
+  // Prefer the LLM's own follow-ups (grounded in what this specific answer covered) —
+  // fall back to the static pool for older cached turns or the rare case the model
+  // didn't emit any. Filtered against askedLower either way, as a defensive backstop
+  // for the "never repeat a question already asked" instruction in the prompt.
+  const realFollowUps = last?.followUps?.filter((q) => !askedLower.has(q.trim().toLowerCase()));
+  const followUps = showFollowUps
+    ? realFollowUps?.length
+      ? realFollowUps.slice(0, 3)
+      : pickFollowUps(askedLower, 3)
+    : [];
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", flex: "1 1 0px", minHeight: 0 }}>

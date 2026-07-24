@@ -8,7 +8,8 @@ export type WidgetType =
   | "github_activity"
   | "resume_preview"
   | "skill_graph"
-  | "jd_match";
+  | "jd_match"
+  | "followups";
 
 export interface Widget {
   type: WidgetType;
@@ -28,6 +29,7 @@ export interface Message {
   role: Role;
   content: string;
   widgets?: Widget[];
+  followUps?: string[];
   steps?: Step[];
   isStreaming?: boolean;
   isError?: boolean;
