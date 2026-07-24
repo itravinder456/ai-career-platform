@@ -8,6 +8,7 @@ from app.db.qdrant import close_qdrant, ensure_collection
 from app.db.redis import close_redis, get_redis_client
 from core.config import get_settings
 from core.logging.setup import configure_logging, get_logger
+from core.telemetry import configure_telemetry
 
 log = get_logger(__name__)
 
@@ -16,6 +17,11 @@ log = get_logger(__name__)
 async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_logging(service=settings.app_name, level=settings.log_level)
+    configure_telemetry(
+        settings.otel_service_name or settings.app_name,
+        settings.otel_endpoint,
+        settings.otel_headers,
+    )
     log.info("api.startup")
 
     try:

@@ -10,7 +10,9 @@ from langchain_core.tools import BaseTool
 from core.config import AppSettings
 
 
-def build_llm(settings: AppSettings, tools: list[BaseTool] | None = None) -> BaseChatModel:
+def build_llm(
+    settings: AppSettings, tools: list[BaseTool] | None = None
+) -> BaseChatModel:
     provider = settings.llm_provider.lower()
 
     if provider == "groq":
@@ -23,19 +25,13 @@ def build_llm(settings: AppSettings, tools: list[BaseTool] | None = None) -> Bas
             api_key=settings.groq_api_key.get_secret_value(),
             temperature=settings.llm_temperature,
         )
-    elif provider == "ollama":
-        from langchain_ollama import ChatOllama
-
-        llm = ChatOllama(
-            model=settings.ollama_model,
-            base_url=settings.ollama_base_url,
-            temperature=settings.llm_temperature,
-        )
     elif provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
 
         if not settings.anthropic_api_key:
-            raise ValueError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic")
+            raise ValueError(
+                "ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic"
+            )
         llm = ChatAnthropic(
             model=settings.anthropic_model,
             api_key=settings.anthropic_api_key.get_secret_value(),

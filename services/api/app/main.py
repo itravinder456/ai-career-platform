@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from app.api.v1.routers import register_routers
 from app.core.lifespan import lifespan
@@ -32,6 +34,11 @@ register_exception_handlers(app)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 register_routers(app)
+
+# ── Tracing (spans created here get service.name from configure_telemetry in
+# lifespan.py, and outgoing httpx calls carry the trace context to runtime) ────
+FastAPIInstrumentor.instrument_app(app)
+HTTPXClientInstrumentor().instrument()
 
 
 if __name__ == "__main__":

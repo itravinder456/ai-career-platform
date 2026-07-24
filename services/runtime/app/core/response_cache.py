@@ -19,6 +19,7 @@ import hashlib
 import json
 
 from app.core.cache import cache_get, cache_set
+from core.config import get_settings
 from core.logging.setup import get_logger
 
 log = get_logger(__name__)
@@ -33,6 +34,8 @@ def _key(message: str) -> str:
 
 
 async def get_cached_turn(message: str) -> tuple[str, list[dict]] | None:
+    if not get_settings().response_cache_enabled:
+        return None
     raw = await cache_get(_key(message))
     if raw is None:
         return None
@@ -45,7 +48,7 @@ async def get_cached_turn(message: str) -> tuple[str, list[dict]] | None:
 
 
 async def set_cached_turn(message: str, response: str, widgets: list[dict]) -> None:
-    if not response:
+    if not response or not get_settings().response_cache_enabled:
         return
     payload = json.dumps({"response": response, "widgets": widgets})
     await cache_set(_key(message), payload, TTL_SECONDS)

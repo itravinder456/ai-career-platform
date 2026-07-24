@@ -66,58 +66,109 @@ class AppSettings(BaseSettings):
 
     # ── Redis (api, runtime) ───────────────────────────────────────────────
     redis_url: SecretStr | None = Field(default=None, alias="REDIS_URL")
-    redis_max_connections: int = Field(default=REDIS_MAX_CONNECTIONS, alias="REDIS_MAX_CONNECTIONS")
-    session_ttl_seconds: int = Field(default=SESSION_TTL_SECONDS, alias="SESSION_TTL_SECONDS")
+    redis_max_connections: int = Field(
+        default=REDIS_MAX_CONNECTIONS, alias="REDIS_MAX_CONNECTIONS"
+    )
+    session_ttl_seconds: int = Field(
+        default=SESSION_TTL_SECONDS, alias="SESSION_TTL_SECONDS"
+    )
+    # Two independent toggles, one per cache layer in services/runtime's chat flow —
+    # see docs/OBSERVABILITY.md's caching section for the full picture:
+    #   response_cache_enabled — the OUTER cache (app/core/response_cache.py). A hit
+    #     skips the entire graph: plan_tasks, retrieval, execute_task, respond — all of
+    #     it. Keyed on the raw user message only.
+    #   rag_cache_enabled      — the INNER cache (app/tools/retrieval.py), only ever
+    #     reached when the outer one misses. A hit skips just the Qdrant search.
+    # Both off during eval/dev iteration so a re-ingested collection, a swapped
+    # embedding provider, or a swapped LLM provider is felt on the very next query
+    # instead of serving a stale cached turn or stale retrieved chunks.
+    response_cache_enabled: bool = Field(default=True, alias="RESPONSE_CACHE_ENABLED")
+    rag_cache_enabled: bool = Field(default=True, alias="RAG_CACHE_ENABLED")
 
     # ── Qdrant (api, runtime) ──────────────────────────────────────────────
     qdrant_url: str | None = Field(default=None, alias="QDRANT_URL")
     qdrant_api_key: SecretStr | None = Field(default=None, alias="QDRANT_API_KEY")
-    qdrant_collection: str = Field(default=DEFAULT_QDRANT_COLLECTION, alias="QDRANT_COLLECTION")
-    qdrant_vector_size: int = Field(default=EMBEDDING_VECTOR_SIZE, alias="QDRANT_VECTOR_SIZE")
+    qdrant_collection: str = Field(
+        default=DEFAULT_QDRANT_COLLECTION, alias="QDRANT_COLLECTION"
+    )
+    qdrant_vector_size: int = Field(
+        default=EMBEDDING_VECTOR_SIZE, alias="QDRANT_VECTOR_SIZE"
+    )
 
     # ── Auth (api) ─────────────────────────────────────────────────────────
     admin_secret_key: SecretStr | None = Field(default=None, alias="ADMIN_SECRET_KEY")
     jwt_secret: SecretStr | None = Field(default=None, alias="JWT_SECRET")
     jwt_algorithm: str = Field(default=JWT_ALGORITHM, alias="JWT_ALGORITHM")
-    jwt_expiry_minutes: int = Field(default=JWT_EXPIRY_MINUTES, alias="JWT_EXPIRY_MINUTES")
+    jwt_expiry_minutes: int = Field(
+        default=JWT_EXPIRY_MINUTES, alias="JWT_EXPIRY_MINUTES"
+    )
 
     # ── LLM (runtime) ──────────────────────────────────────────────────────
     llm_provider: str = Field(default=DEFAULT_LLM_PROVIDER, alias="LLM_PROVIDER")
     openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default=OPENAI_DEFAULT_MODEL, alias="OPENAI_MODEL")
     anthropic_api_key: SecretStr | None = Field(default=None, alias="ANTHROPIC_API_KEY")
-    anthropic_model: str = Field(default=ANTHROPIC_DEFAULT_MODEL, alias="ANTHROPIC_MODEL")
-    anthropic_max_tokens: int = Field(default=ANTHROPIC_MAX_TOKENS, alias="ANTHROPIC_MAX_TOKENS")
-    anthropic_temperature: float = Field(default=ANTHROPIC_TEMPERATURE, alias="ANTHROPIC_TEMPERATURE")
+    anthropic_model: str = Field(
+        default=ANTHROPIC_DEFAULT_MODEL, alias="ANTHROPIC_MODEL"
+    )
+    anthropic_max_tokens: int = Field(
+        default=ANTHROPIC_MAX_TOKENS, alias="ANTHROPIC_MAX_TOKENS"
+    )
+    anthropic_temperature: float = Field(
+        default=ANTHROPIC_TEMPERATURE, alias="ANTHROPIC_TEMPERATURE"
+    )
     groq_api_key: SecretStr | None = Field(default=None, alias="GROQ_API_KEY")
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
-    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+    ollama_base_url: str = Field(
+        default="http://localhost:11434", alias="OLLAMA_BASE_URL"
+    )
     ollama_model: str = Field(default="llama3.2", alias="OLLAMA_MODEL")
-    llm_temperature: float = Field(default=ANTHROPIC_TEMPERATURE, alias="LLM_TEMPERATURE")
+    llm_temperature: float = Field(
+        default=ANTHROPIC_TEMPERATURE, alias="LLM_TEMPERATURE"
+    )
     llm_max_tokens: int = Field(default=ANTHROPIC_MAX_TOKENS, alias="LLM_MAX_TOKENS")
-    embedding_provider: str = Field(default=EMBEDDING_DEFAULT_PROVIDER, alias="EMBEDDING_PROVIDER")
-    embedding_model: str = Field(default=EMBEDDING_DEFAULT_MODEL, alias="EMBEDDING_MODEL")
-    embedding_vector_size: int = Field(default=EMBEDDING_VECTOR_SIZE, alias="EMBEDDING_VECTOR_SIZE")
+    embedding_provider: str = Field(
+        default=EMBEDDING_DEFAULT_PROVIDER, alias="EMBEDDING_PROVIDER"
+    )
+    embedding_model: str = Field(
+        default=EMBEDDING_DEFAULT_MODEL, alias="EMBEDDING_MODEL"
+    )
+    embedding_vector_size: int = Field(
+        default=EMBEDDING_VECTOR_SIZE, alias="EMBEDDING_VECTOR_SIZE"
+    )
 
     # ── Observability (api, runtime) ───────────────────────────────────────
     langsmith_api_key: SecretStr | None = Field(default=None, alias="LANGSMITH_API_KEY")
-    langsmith_project: str = Field(default=LANGSMITH_DEFAULT_PROJECT, alias="LANGSMITH_PROJECT")
+    langsmith_project: str = Field(
+        default=LANGSMITH_DEFAULT_PROJECT, alias="LANGSMITH_PROJECT"
+    )
     langsmith_tracing: bool = Field(default=False, alias="LANGSMITH_TRACING")
     otel_endpoint: str = Field(default="", alias="OTEL_ENDPOINT")
+    otel_headers: str = Field(default="", alias="OTEL_HEADERS")
     otel_service_name: str = Field(default="", alias="OTEL_SERVICE_NAME")
 
     # ── API service ────────────────────────────────────────────────────────
     runtime_url: str = Field(default=DEFAULT_RUNTIME_URL, alias="RUNTIME_URL")
-    cors_origins: list[str] = Field(default_factory=lambda: DEFAULT_CORS_ORIGINS, alias="CORS_ORIGINS")
+    cors_origins: list[str] = Field(
+        default_factory=lambda: DEFAULT_CORS_ORIGINS, alias="CORS_ORIGINS"
+    )
 
     # ── Rate limiting (api) — protects the public /chat endpoint's OpenAI/Qdrant/
     # Postgres cost from a single client. Two independent windows, both must pass.
-    rate_limit_per_minute: int = Field(default=RATE_LIMIT_PER_MINUTE, alias="RATE_LIMIT_PER_MINUTE")
-    rate_limit_per_day: int = Field(default=RATE_LIMIT_PER_DAY, alias="RATE_LIMIT_PER_DAY")
+    rate_limit_per_minute: int = Field(
+        default=RATE_LIMIT_PER_MINUTE, alias="RATE_LIMIT_PER_MINUTE"
+    )
+    rate_limit_per_day: int = Field(
+        default=RATE_LIMIT_PER_DAY, alias="RATE_LIMIT_PER_DAY"
+    )
 
     # ── Runtime service ────────────────────────────────────────────────────
-    max_iterations: int = Field(default=AGENT_MAX_ITERATIONS, alias="AGENT_MAX_ITERATIONS")
-    agent_timeout_seconds: int = Field(default=AGENT_TIMEOUT_SECONDS, alias="AGENT_TIMEOUT_SECONDS")
+    max_iterations: int = Field(
+        default=AGENT_MAX_ITERATIONS, alias="AGENT_MAX_ITERATIONS"
+    )
+    agent_timeout_seconds: int = Field(
+        default=AGENT_TIMEOUT_SECONDS, alias="AGENT_TIMEOUT_SECONDS"
+    )
 
     @field_validator("environment")
     @classmethod

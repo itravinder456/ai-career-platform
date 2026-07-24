@@ -1,6 +1,7 @@
 import time
 import uuid
 
+import structlog
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
@@ -15,24 +16,19 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid.uuid4())[:8]
         start = time.perf_counter()
 
-        log.info(
-            "request.start",
-            request_id=request_id,
-            method=request.method,
-            path=request.url.path,
-        )
+        with structlog.contextvars.bound_contextvars(request_id=request_id):
+            log.info("request.start", method=request.method, path=request.url.path)
 
-        response = await call_next(request)
-        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+            response = await call_next(request)
+            duration_ms = round((time.perf_counter() - start) * 1000, 1)
 
-        log.info(
-            "request.end",
-            request_id=request_id,
-            method=request.method,
-            path=request.url.path,
-            status=response.status_code,
-            duration_ms=duration_ms,
-        )
+            log.info(
+                "request.end",
+                method=request.method,
+                path=request.url.path,
+                status=response.status_code,
+                duration_ms=duration_ms,
+            )
 
         response.headers["X-Request-ID"] = request_id
         return response

@@ -29,9 +29,14 @@ _qdrant: AsyncQdrantClient | None = None
 def get_qdrant_client() -> AsyncQdrantClient:
     global _qdrant
     if _qdrant is None:
-        s = get_settings()
-        api_key = s.qdrant_api_key.get_secret_value() if s.qdrant_api_key else None
-        _qdrant = AsyncQdrantClient(url=s.qdrant_url, api_key=api_key)
+        try:
+            s = get_settings()
+            api_key = s.qdrant_api_key.get_secret_value() if s.qdrant_api_key else None
+            _qdrant = AsyncQdrantClient(url=s.qdrant_url, api_key=api_key)
+            log.info("qdrant.ready", url=s.qdrant_url, collection=s.qdrant_collection)
+        except Exception as exc:
+            log.warning("qdrant.unavailable", error=str(exc))
+            raise RuntimeError("Qdrant client unavailable") from exc
     return _qdrant
 
 
@@ -61,11 +66,12 @@ async def retrieve_context(query: str, limit: int = RESULT_LIMIT) -> str:
     settings = get_settings()
     cache_key = _cache_key(settings.qdrant_collection, query)
 
-    cached = await cache_get(cache_key)
-    if cached is not None:
-        log.info("cache.hit", key=cache_key)
-        return cached
-    log.info("cache.miss", key=cache_key)
+    if settings.rag_cache_enabled:
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            log.info("cache.hit", key=cache_key)
+            return cached
+        log.info("cache.miss", key=cache_key)
 
     try:
         embedding = await embed_query(query)
@@ -81,10 +87,13 @@ async def retrieve_context(query: str, limit: int = RESULT_LIMIT) -> str:
     if not response.points:
         result = "No relevant information found in the knowledge base."
     else:
-        result = "\n\n".join(f"[{p.payload['source']}] {p.payload['text']}" for p in response.points)
+        result = "\n\n".join(
+            f"[{p.payload['source']}] {p.payload['text']}" for p in response.points
+        )
 
-    await cache_set(cache_key, result, CACHE_TTL_SECONDS)
-    log.info("cache.set", key=cache_key, ttl_seconds=CACHE_TTL_SECONDS)
+    if settings.rag_cache_enabled:
+        await cache_set(cache_key, result, CACHE_TTL_SECONDS)
+        log.info("cache.set", key=cache_key, ttl_seconds=CACHE_TTL_SECONDS)
     return result
 
 

@@ -52,6 +52,31 @@ was built, how it works)
 - architecture: asking how something is designed or structured, or how it works internally
 - general: anything else — greetings, small talk, "tell me about yourself", or unclear intent
 
+If the question uses subjective or superlative language ("most complex", "hardest", "most \
+impressive", "biggest"), the rewritten query must REPLACE the vague word with the concrete \
+technical signals that would indicate that judgment — not just rephrase the sentence around it. \
+Retrieval is a semantic search over indexed text, and nothing in the knowledge base is literally \
+tagged "complex", so a query that still contains the vague word has nothing to match against.
+
+Example — input: "walk me through your most complex project"
+Wrong (still vague): "Can you walk me through your most complex project, explaining what it \
+involved and how it was executed?"
+Right (concrete signals instead): "project involving multi-agent orchestration, distributed or \
+event-driven architecture, and the largest production scope"
+
+Similarly, if the question asks about "tools" as a vague catch-all (e.g. "which tools do you \
+use", "what do you work with daily"), rewrite the query around the concrete categories that \
+phrase actually means — software, frameworks, libraries, AI copilots/coding assistants (e.g. \
+Cursor, GitHub Copilot, Claude Code), dev platforms — and drop any framing the knowledge base \
+has no data for. Usage frequency ("daily", "regularly", "most often") isn't tracked anywhere —
+keeping it in the query gives retrieval nothing to match, same problem as the superlative case \
+above.
+
+Example — input: "which tools do you work with daily?"
+Wrong (still asks for untracked frequency data): "What tools do you work with on a daily basis?"
+Right (concrete categories instead): "software, frameworks, libraries, AI coding assistants, \
+and development platforms used"
+
 Reply with ONLY a JSON array, no markdown code fences, no explanation before or after it — just \
 the array itself:
 
@@ -345,15 +370,24 @@ Supported widget types and their JSON schemas:
 - WIDGET:project_card:{{"name":"...","description":"...","status":"...","tech":["..."],"impact":["..."],"github":"url or null"}}
 - WIDGET:resume_preview:{{"name":"...","title":"...","experience":[{{"company":"...","role":"...","duration":"...","highlight":"..."}}],"education":"...","downloadUrl":"/resume"}}
 - WIDGET:architecture:{{"layers":[{{"name":"...","items":["..."]}}]}}
+- WIDGET:followups:{{"questions":["...","...","..."]}}
 
 For skills, use the tech_stack widget (grouped plain lists — no numeric levels).
 
 You may emit more than one WIDGET block in a single response — one per distinct facet where it
 genuinely helps visualise the data (e.g. a project_card for a project question and a tech_stack
 for a skills question, in one compound reply). Put each on its own line. Never emit two widgets
-of the same type, and never emit a widget for a facet that wasn't actually asked about. At most
-4 widgets total. Every field must come from retrieved content — never invent a company, metric,
-tech, or number to fill a widget.
+of the same type, and never emit a visualisation widget for a facet that wasn't actually asked
+about. At most 4 visualisation widgets total. Every field must come from retrieved content —
+never invent a company, metric, tech, or number to fill a widget.
+
+The followups widget is different from the visualisation widgets above — always include exactly
+one, as the LAST block, regardless of whether you used any other widgets. Give 2-3 natural next
+questions a recruiter would plausibly ask right after *this specific answer* — grounded in what
+was actually just discussed, specific enough that they only make sense following this answer
+(not generic questions that would fit after any answer). Never repeat a question already asked
+earlier in this conversation, and never suggest something the retrieved context can't actually
+answer.
 """
 
 
