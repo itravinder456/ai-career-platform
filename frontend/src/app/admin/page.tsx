@@ -9,10 +9,11 @@ import ProjectsSection from "./_sections/ProjectsSection";
 import ExperienceSection from "./_sections/ExperienceSection";
 import SkillsSection from "./_sections/SkillsSection";
 import DocumentsSection from "./_sections/DocumentsSection";
+import ConversationsSection from "./_sections/ConversationsSection";
 
 const STORAGE_KEY = "admin_key";
 
-const TABS = ["Profile", "Projects", "Experience", "Skills", "Documents"] as const;
+const TABS = ["Profile", "Projects", "Experience", "Skills", "Documents", "Conversations"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function AdminPage() {
@@ -114,8 +115,11 @@ export default function AdminPage() {
   }
 
   return (
-    <PageShell eyebrow="ADMIN.LOG" title="Admin" subtitle="Edit profile, projects, experience, skills, and documents." compact>
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <PageShell eyebrow="ADMIN.LOG" title="Admin" subtitle="Edit profile, projects, experience, skills, documents, and review chat conversations." compact>
+      {/* One width for every tab — switching tabs shouldn't visibly resize the
+          page. 1100 is wide enough for Conversations' list+transcript pair;
+          the narrower forms just get a bit more breathing room. */}
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <div
         style={{
           display: "flex",
@@ -176,6 +180,7 @@ export default function AdminPage() {
       {tab === "Experience" && <ExperienceSection adminKey={adminKey} onAuthError={lock} />}
       {tab === "Skills" && <SkillsSection adminKey={adminKey} onAuthError={lock} />}
       {tab === "Documents" && <DocumentsSection adminKey={adminKey} onAuthError={lock} />}
+      {tab === "Conversations" && <ConversationsSection adminKey={adminKey} onAuthError={lock} />}
       </div>
     </PageShell>
   );

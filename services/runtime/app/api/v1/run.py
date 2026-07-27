@@ -23,6 +23,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import Field
 
 from app.core.response_cache import get_cached_turn, set_cached_turn
+from app.prompts.career import parse_widget_block
 from app.state.agent_state import AgentState
 from app.streaming import TokenWidgetSplitter
 from core.config.constants import CHAT_MESSAGE_MAX_LENGTH
@@ -59,6 +60,40 @@ async def clear_run(session_id: str, request: Request) -> Response:
     await checkpointer.adelete_thread(session_id)
     log.info("run.cleared", session_id=session_id)
     return Response(status_code=204)
+
+
+@router.get("/run/{session_id}/history")
+async def get_history(session_id: str, request: Request) -> list[dict[str, Any]]:
+    """Internal endpoint (same trust model as POST /run — called only by
+    services/api's admin routes) that returns this session's full transcript
+    from the checkpointer, for the admin UI's conversation detail view.
+
+    The checkpointer stores each AI message's raw content, including any
+    trailing WIDGET:<type>:<json> block(s) — the live chat only ever sees
+    those after run.py's SSE loop splits them out via TokenWidgetSplitter.
+    Reusing parse_widget_block (the same parser TokenWidgetSplitter.finish()
+    calls) here means the admin view shows the same clean text + structured
+    widgets a real visitor saw, not the raw marker syntax."""
+    career_graph = request.app.state.career_graph
+    config = {"configurable": {"thread_id": session_id}}
+    snapshot = await career_graph.aget_state(config)
+    messages = snapshot.values.get("messages", [])
+
+    history: list[dict[str, Any]] = []
+    for m in messages:
+        content = _normalize_content(m.content)
+        widgets: list[dict] = []
+        if m.type == "ai":
+            content, raw_widgets = parse_widget_block(content)
+            # parse_widget_block returns the SSE wire envelope
+            # ({"type": "widget", "widget_type": ..., "data": ...} — see
+            # SSEWidget in services/api/app/schemas/chat.py); the frontend's
+            # Widget type (types/chat.ts) is {type: <widget_type>, data} —
+            # services/chat.ts does this same rename for the live stream, so
+            # the admin transcript needs it too or WidgetRenderer never matches.
+            widgets = [{"type": w["widget_type"], "data": w["data"]} for w in raw_widgets]
+        history.append({"role": m.type, "content": content, "widgets": widgets})
+    return history
 
 
 def _sse(data: dict) -> str:

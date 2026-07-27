@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { AppState } from "@/types/chat";
@@ -45,6 +46,7 @@ export default function Navbar({
   const solid = inChat || scrolled;
   const { links } = useProfile();
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
 
   const pageLinks = [
     { href: "/projects", label: "Projects" },
@@ -144,29 +146,37 @@ export default function Navbar({
             Ask Ravinder
           </MotionLink>
           <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 6px", flexShrink: 0 }} />
-          {pageLinks.map(({ href, label }, i) => (
-            <MotionLink
-              key={href}
-              href={href}
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05, duration: 0.35 }}
-              whileHover={{ scale: 1.02 }}
-              style={linkPillStyle(true)}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.background = "rgba(255,255,255,0.06)";
-                el.style.color = "var(--text-secondary)";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.background = "transparent";
-                el.style.color = "var(--text-muted)";
-              }}
-            >
-              {label}
-            </MotionLink>
-          ))}
+          {pageLinks.map(({ href, label }, i) => {
+            const isActive = pathname === href;
+            return (
+              <MotionLink
+                key={href}
+                href={href}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05, duration: 0.35 }}
+                whileHover={{ scale: 1.02 }}
+                style={{
+                  ...linkPillStyle(!isActive),
+                  background: isActive ? "rgba(201,122,61,0.12)" : "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  if (isActive) return;
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.background = "rgba(255,255,255,0.06)";
+                  el.style.color = "var(--text-secondary)";
+                }}
+                onMouseLeave={(e) => {
+                  if (isActive) return;
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.background = "transparent";
+                  el.style.color = "var(--text-muted)";
+                }}
+              >
+                {label}
+              </MotionLink>
+            );
+          })}
           <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 6px", flexShrink: 0 }} />
           {links.map(({ id, href, label, download }, i) => (
             <motion.a
@@ -252,16 +262,27 @@ export default function Navbar({
               >
                 Ask Ravinder
               </Link>
-              {pageLinks.map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMenuOpen(false)}
-                  style={{ padding: "12px 8px", fontSize: 14, fontWeight: 500, color: "var(--text-secondary)", textDecoration: "none" }}
-                >
-                  {label}
-                </Link>
-              ))}
+              {pageLinks.map(({ href, label }) => {
+                const isActive = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      padding: "12px 8px",
+                      borderRadius: 8,
+                      fontSize: 14,
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? "var(--copper-bright)" : "var(--text-secondary)",
+                      background: isActive ? "rgba(201,122,61,0.1)" : "transparent",
+                      textDecoration: "none",
+                    }}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
               <div style={{ height: 1, background: "var(--border)", margin: "8px 8px" }} />
               {links.map(({ id, href, label, download }) => (
                 <a

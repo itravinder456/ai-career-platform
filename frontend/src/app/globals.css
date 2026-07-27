@@ -1141,6 +1141,20 @@ ul li::marker {
   }
 }
 
+/* Conversations tab — list + transcript side by side; stacks on tablet/phone
+   since there's no room for two independently-scrolling panes below 900px. */
+.admin-conversations-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .admin-conversations-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Navbar — hamburger + dropdown below 640px ─────────────────────────────────
    "Ask Ravinder" + 3 page links + up to 3 social links (7 items) plus the
    logo don't fit one row on a phone. A horizontally-scrollable strip was

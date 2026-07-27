@@ -1,3 +1,4 @@
+from app.db.models.conversation import ChatSession
 from app.db.models.document import Document
 from app.db.models.experience import Experience
 from app.db.models.profile import Profile, ProfileStat, SocialLink
@@ -12,4 +13,5 @@ __all__ = [
     "Experience",
     "Skill",
     "Document",
+    "ChatSession",
 ]

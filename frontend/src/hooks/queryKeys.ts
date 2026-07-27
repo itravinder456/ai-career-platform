@@ -7,4 +7,6 @@ export const queryKeys = {
   experiences: ["experiences"] as const,
   skills: ["skills"] as const,
   documents: (docType: string) => ["documents", docType] as const,
+  conversations: ["conversations"] as const,
+  conversation: (sessionId: string) => ["conversations", sessionId] as const,
 };

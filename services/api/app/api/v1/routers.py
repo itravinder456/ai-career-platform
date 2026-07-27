@@ -1,5 +1,15 @@
 from fastapi import FastAPI
-from app.api.v1 import admin, chat, documents, experiences, health, profile, projects, skills
+from app.api.v1 import (
+    admin,
+    chat,
+    conversations,
+    documents,
+    experiences,
+    health,
+    profile,
+    projects,
+    skills,
+)
 
 
 def register_routers(app: FastAPI) -> None:
@@ -11,3 +21,4 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(skills.router, prefix="/api/v1", tags=["skills"])
     app.include_router(documents.router, prefix="/api/v1", tags=["documents"])
     app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
+    app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"])

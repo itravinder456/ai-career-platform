@@ -2,11 +2,15 @@ import json
 from collections.abc import AsyncGenerator
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sse_starlette.sse import EventSourceResponse
 
 from app.clients.http import get_http_client
+from app.db.models import ChatSession
+from app.dependencies.db import DB
 from app.dependencies.rate_limit import RateLimit
 from app.dependencies.settings import Settings
 from app.schemas.chat import (
@@ -24,8 +28,31 @@ log = get_logger(__name__)
 router = APIRouter()
 
 
+async def _record_session_activity(db: DB, session_id: str, message: str, user_agent: str | None) -> None:
+    """Upserts admin-visible session metadata — no name/IP by design, see
+    services/api/app/db/models/conversation.py. Atomic INSERT..ON CONFLICT so
+    concurrent turns for the same session_id can't race on a read-then-write."""
+    stmt = pg_insert(ChatSession).values(
+        session_id=session_id,
+        message_count=1,
+        user_agent=user_agent,
+        first_message_preview=message[:300],
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[ChatSession.session_id],
+        set_={
+            "message_count": ChatSession.message_count + 1,
+            "user_agent": stmt.excluded.user_agent,
+            "updated_at": func.now(),
+        },
+    )
+    await db.execute(stmt)
+
+
 @router.post("/chat")
-async def chat(body: ChatRequest, settings: Settings, _rate_limit: RateLimit) -> StreamingResponse:
+async def chat(
+    body: ChatRequest, request: Request, settings: Settings, db: DB, _rate_limit: RateLimit
+) -> StreamingResponse:
     """
     Accepts a chat message and streams the runtime's SSE response back to the
     client token-by-token. Conversation history lives entirely in runtime's
@@ -35,6 +62,18 @@ async def chat(body: ChatRequest, settings: Settings, _rate_limit: RateLimit) ->
     route that fans out to a paid LLM call, so it's the one that needs protecting
     from a single client running up cost.
     """
+    try:
+        await _record_session_activity(
+            db, body.session_id, body.message, request.headers.get("user-agent")
+        )
+    except Exception as exc:
+        # Session tracking is admin-UI convenience, not core to the chat path —
+        # never let a DB hiccup here block an actual reply. Roll back explicitly
+        # so get_db_session's own commit-on-exit (app/db/postgres.py) doesn't
+        # then fail trying to commit an aborted transaction.
+        await db.rollback()
+        log.warning("chat.session_tracking_failed", error=str(exc))
+
     return EventSourceResponse(
         _stream(body, settings),
         media_type="text/event-stream",
